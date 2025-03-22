@@ -1,0 +1,5 @@
+nextcord
+asyncpg
+flask_socketio
+eventlet
+aiohttp

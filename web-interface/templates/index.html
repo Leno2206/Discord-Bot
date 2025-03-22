@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Bot & Notizen</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        .status {
+            font-size: 2em;
+            color: green;
+        }
+        .status.offline {
+            color: red;
+        }
+        .user-info {
+            background-color: #7289DA;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+        .user-info img {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 1.2em;
+            margin-top: 20px;
+            background-color: #ff6347;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #e0533f;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        .note-list {
+            margin-top: 30px;
+            text-align: left;
+            display: inline-block;
+            width: 80%;
+            max-width: 600px;
+        }
+        .note-item {
+            background: #f4f4f4;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+            position: relative;
+        }
+        .note-actions a {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 5px;
+            width: 300px;
+            text-align: center;
+        }
+        .close {
+            color: red;
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        .logout-button {
+            background-color: #7289DA;
+            padding: 8px 15px;
+            border-radius: 4px;
+            color: white;
+            text-decoration: none;
+            font-size: 0.9em;
+            margin-left: 15px;
+        }
+        .login-button {
+            display: inline-block;
+            background-color: #7289DA;
+            color: white;
+            padding: 12px 24px;
+            font-size: 1.2em;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        .login-button:hover {
+            background-color: #5b6eae;
+        }
+        .login-icon {
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        .content-container {
+            margin-top: 30px;
+        }
+        .login-container {
+            margin: 50px auto;
+            max-width: 500px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Discord Bot Status</h1>
+    
+    {% if user %}
+    <!-- Angemeldeter Benutzer -->
+    <div class="user-info">
+        {% if user.avatar %}
+        <img src="https://cdn.discordapp.com/avatars/{{ user.id }}/{{ user.avatar }}.png" alt="Avatar">
+        {% endif %}
+        Eingeloggt als: <strong>{{ user.username }}</strong>
+        <a href="/logout" class="logout-button">Ausloggen</a>
+    </div>
+    
+    <div class="content-container">
+        <div id="botStatus" class="status offline">
+            Bot ist Offline
+        </div>
+    
+        <br>
+    
+        <button id="restartButton" onclick="restartBot()">Bot Neustarten 🔄</button>
+    </div>
+    
+    <script>
+    async function updateStatus() {
+        try {
+            let response = await fetch("/status");
+            let data = await response.json();
+            let statusDiv = document.getElementById("botStatus");
+    
+            if (data.status === "online") {
+                statusDiv.innerText = "Bot ist Online";
+                statusDiv.classList.remove("offline");
+            } else {
+                statusDiv.innerText = "Bot ist Offline";
+                statusDiv.classList.add("offline");
+            }
+        } catch (error) {
+            console.error("Fehler beim Abrufen des Status:", error);
+        }
+    }
+    
+    // Automatische Status-Aktualisierung alle 5 Sekunden
+    setInterval(updateStatus, 5000);
+    updateStatus();
+    
+    async function restartBot() {
+        let button = document.getElementById("restartButton");
+        button.disabled = true;
+        button.innerText = "Neustart läuft...";
+    
+        try {
+            let response = await fetch("/restart", { method: "POST" });
+            let data = await response.json();
+    
+            if (data.success) {
+                console.log("Bot wird neu gestartet...");
+                setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
+            } else {
+                alert("Fehler beim Neustart: " + data.message);
+            }
+        } catch (error) {
+            alert("Fehler beim Neustart.");
+            console.error(error);
+        }
+    
+        setTimeout(() => {
+            button.disabled = false;
+            button.innerText = "Bot Neustarten 🔄";
+        }, 10000); // Nach 10 Sekunden wieder aktivieren
+    }
+    </script>
+        <div id="message"></div>
+
+        <h2>📝 Notizen</h2>
+        <form action="/add_note" method="post">
+            <input type="text" name="note" placeholder="Neue Notiz..." required>
+            <button type="submit">Hinzufügen</button>
+        </form>
+
+        <div class="note-list">
+            {% if notes %}
+                {% for note in notes %}
+                <div class="note-item">
+                    <span id="note-text-{{ note[0] }}">{{ note[1] }}</span>
+                    <span class="note-actions">
+                        <a onclick="openEditModal({{ note[0] }}, '{{ note[1] }}')">✏️ Bearbeiten</a>
+                        <a href="{{ url_for('delete_note', note_id=note[0]) }}" onclick="return confirm('Löschen?')">🗑️ Löschen</a>
+                    </span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p>Keine Notizen gefunden.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Nicht angemeldeter Benutzer - Login-Bereich -->
+    <div class="login-container">
+        <h2>Willkommen bei der Discord Bot Verwaltung</h2>
+        <p>Um den Bot zu verwalten und Notizen zu sehen, melde dich bitte mit deinem Discord-Konto an.</p>
+        <a href="/login" class="login-button">
+            <span class="login-icon">🔑</span> Mit Discord anmelden
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Modal for Editing Notes -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeEditModal()">&times;</span>
+            <h2>✏️ Notiz bearbeiten</h2>
+            <form id="editForm">
+                <input type="hidden" id="editNoteId">
+                <input type="text" id="editNoteText" required>
+                <button type="submit">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function restartBot() {
+            document.querySelector(".status").classList.add("offline");
+            document.querySelector(".status").textContent = "Bot ist Offline";
+
+            fetch("/restart", { method: "POST" })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById("message").textContent = data.message;
+                } else {
+                    document.getElementById("message").textContent = "Fehler beim Stoppen des Bots.";
+                }
+            })
+            .catch(error => {
+                document.getElementById("message").textContent = "Fehler: " + error;
+            });
+        }
+
+        // Open edit modal
+        function openEditModal(noteId, noteText) {
+            document.getElementById("editNoteId").value = noteId;
+            document.getElementById("editNoteText").value = noteText;
+            document.getElementById("editModal").style.display = "block";
+        }
+
+        // Close edit modal
+        function closeEditModal() {
+            document.getElementById("editModal").style.display = "none";
+        }
+
+        // AJAX Form Submission for Editing Notes
+        document.getElementById("editForm").addEventListener("submit", function(event) {
+            event.preventDefault();
+            const noteId = document.getElementById("editNoteId").value;
+            const newText = document.getElementById("editNoteText").value;
+
+            fetch(`/edit_note/${noteId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: `note=${encodeURIComponent(newText)}`
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById(`note-text-${noteId}`).textContent = newText;
+                    closeEditModal();
+                } else {
+                    alert("Fehler beim Speichern!");
+                }
+            });
+        });
+
+        // Close modal if clicked outside
+        window.onclick = function(event) {
+            const modal = document.getElementById("editModal");
+            if (event.target === modal) {
+                closeEditModal();
+            }
+        };
+    </script>
+
+</body>
+</html>
