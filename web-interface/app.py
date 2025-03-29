@@ -177,36 +177,32 @@ def delete_note(note_id):
 
 @app.route("/add_reminder", methods=["POST"])
 def add_reminder():
-    """Fügt eine Erinnerung in die Datenbank ein."""
+    """Add a new reminder."""
     if 'discord_id' not in session:
-        return redirect(url_for('login'))  # Stelle sicher, dass nur eingeloggte Nutzer Erinnerungen hinzufügen können
+        return redirect(url_for('login'))
 
     reminder_text = request.form.get("reminder")
-    reminder_time = request.form.get("reminder_time")
+    date = request.form.get("date")  # Datum aus dem Formular
+    time = request.form.get("time")  # Uhrzeit (inkl. Sekunden) aus dem Formular
 
     try:
-        reminder_dt = datetime.strptime(reminder_time, "%Y-%m-%dT%H:%M")
+        # Kombiniere Datum und Uhrzeit zu einem vollständigen datetime-Objekt
+        reminder_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
     except ValueError:
-        return "Ungültiges Zeitformat!", 400
+        flash("Ungültiges Datum oder Uhrzeit!", "error")
+        return redirect(url_for("index"))
 
     conn = get_db_connection()
-    if not conn:
-        flash("Error connecting to the database.", "error")
-        return redirect(url_for("index"))
-
-    try:
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
-            (session['discord_id'], reminder_text, reminder_dt)
-        )
-        conn.commit()
-    except psycopg2.DatabaseError as e:
-        flash(f"Database error: {e}", "error")
-        return redirect(url_for("index"))
-    finally:
+    if conn:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
+                (session['discord_id'], reminder_text, reminder_time)
+            )
+            conn.commit()
         conn.close()
 
+    flash("Erinnerung hinzugefügt!", "success")
     return redirect(url_for("index"))
 
 @app.route("/delete_reminder/<int:reminder_id>")
