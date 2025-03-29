@@ -112,36 +112,43 @@ async def check_reminders():
     """
     logging.info("check_reminders function started")
     while True:
-        # Get the current time as offset-naive to match the database
         now = datetime.now().replace(tzinfo=None)
-        logging.info(f"Current time: {now}")  # Debug: Print the current time
+        logging.info(f"Current time: {now}")
 
         async with db_pool.acquire() as conn:
-            # Fetch reminders that are due
-            rows = await conn.fetch(
-                "SELECT id, discord_id, note FROM reminders WHERE reminder_time <= $1",
+            # Fetch the next due reminder
+            row = await conn.fetchrow(
+                "SELECT id, discord_id, note, reminder_time FROM reminders WHERE reminder_time > $1 ORDER BY reminder_time ASC LIMIT 1",
                 now
             )
-            logging.info(f"Found {len(rows)} reminders due")  # Debug: Print the number of reminders found
 
-            for row in rows:
+            if row:
+                reminder_time = row["reminder_time"]
+                time_until_reminder = (reminder_time - now).total_seconds()
+
+                if time_until_reminder > 0:
+                    logging.info(f"Sleeping for {time_until_reminder} seconds until the next reminder")
+                    await asyncio.sleep(time_until_reminder)
+
+                # Send the reminder
                 user_id = row["discord_id"]
                 note = row["note"]
                 reminder_id = row["id"]
 
-                # Send the reminder to the user
                 try:
                     user = await bot.fetch_user(int(user_id))
                     if user:
                         await user.send(f"⏰ Reminder: {note}")
-                        logging.info(f"Sent reminder to user {user_id}: {note}")  # Info: Log success message
+                        logging.info(f"Sent reminder to user {user_id}: {note}")
                 except Exception as e:
-                    logging.error(f"Failed to send reminder to {user_id}: {e}")  # Error: Log failure
+                    logging.error(f"Failed to send reminder to {user_id}: {e}")
 
                 # Delete the reminder after sending it
                 await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
-                logging.info(f"Deleted reminder {reminder_id}")  # Debug: Log deletion message
-
-        await asyncio.sleep(60)  # Check every 60 seconds
+                logging.info(f"Deleted reminder {reminder_id}")
+            else:
+                # No reminders found, sleep for a short duration before checking again
+                logging.info("No reminders found, sleeping for 10 seconds")
+                await asyncio.sleep(10)
 
 bot.run(TOKEN)
