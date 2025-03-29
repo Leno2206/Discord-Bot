@@ -19,6 +19,9 @@ services:
     environment:
       - DISCORD_TOKEN=MTM1MTE1MjQ5ODk2NjI2NTg5Ng.GUzsLf.14bazwkuNM8ilPYlhj_zigTkF3LwDiyguWokoI
       - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
+    volumes:
+      - /etc/localtime:/etc/localtime:ro  # Synchronisiert die Zeitzone mit dem Host
+      - /etc/timezone:/etc/timezone:ro    # Synchronisiert die Zeitzoneninformationen mit dem Host
     restart: always
 
   web-interface:
