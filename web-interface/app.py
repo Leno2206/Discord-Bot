@@ -173,36 +173,61 @@ def delete_note(note_id):
 
 
 @app.route("/add_reminder", methods=["POST"])
-async def add_reminder():
-    reminder_text = request.form["reminder"]
-    reminder_time = request.form["reminder_time"]
+def add_reminder():
+    """Fügt eine Erinnerung in die Datenbank ein."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))  # Stelle sicher, dass nur eingeloggte Nutzer Erinnerungen hinzufügen können
+
+    reminder_text = request.form.get("reminder")
+    reminder_time = request.form.get("reminder_time")
 
     try:
         reminder_dt = datetime.strptime(reminder_time, "%Y-%m-%dT%H:%M")
     except ValueError:
         return "Ungültiges Zeitformat!", 400
+
     conn = get_db_connection()
     if not conn:
         flash("Error connecting to the database.", "error")
         return redirect(url_for("index"))
-    cursor = conn.cursor()
-    cursor.execute("INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
-                           "WEB_USER", reminder_text, reminder_dt)
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
+            (session['discord_id'], reminder_text, reminder_dt)
+        )
+        conn.commit()
+    except psycopg2.DatabaseError as e:
+        flash(f"Database error: {e}", "error")
+        return redirect(url_for("index"))
+    finally:
+        conn.close()
 
     return redirect(url_for("index"))
 
 @app.route("/delete_reminder/<int:reminder_id>")
-async def delete_reminder(reminder_id):
+def delete_reminder(reminder_id):
+    """Löscht eine Erinnerung aus der Datenbank."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))  # Stelle sicher, dass nur eingeloggte Nutzer Erinnerungen löschen können
+
     conn = get_db_connection()
     if not conn:
         flash("Error connecting to the database.", "error")
         return redirect(url_for("index"))
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
-    conn.commit()
-    conn.close()
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM reminders WHERE id = %s AND discord_id = %s", (reminder_id, session['discord_id']))
+        conn.commit()
+    except psycopg2.DatabaseError as e:
+        flash(f"Database error: {e}", "error")
+    finally:
+        conn.close()
 
     return redirect(url_for("index"))
+
 
 import subprocess
 
