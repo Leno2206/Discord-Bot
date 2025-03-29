@@ -8,6 +8,8 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: notesdb
     volumes:
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro 
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432" 
@@ -34,7 +36,9 @@ services:
     ports:
       - "187:187"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock 
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro 
     restart: always
 
 volumes:
