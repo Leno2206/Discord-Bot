@@ -111,11 +111,13 @@ def index():
             cursor = conn.cursor()
             cursor.execute("SELECT id, note FROM notes WHERE discord_id = %s", (discord_id,))
             notes = cursor.fetchall()
+            cursor.execute("SELECT id, note, reminder_time FROM reminders WHERE discord_id = %s", (user['id'],))
+            reminders = cursor.fetchall()
             conn.close()
             status = True
     
     # Render template mit Kontext-Daten
-    return render_template('index.html', user=user, notes=notes, status=status)
+    return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders)
 
 @app.route("/add_note", methods=["POST"])
 def add_note():
