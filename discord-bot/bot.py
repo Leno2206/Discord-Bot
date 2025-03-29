@@ -114,7 +114,7 @@ async def check_reminders():
     while True:
         # Get the current time as offset-naive to match the database
         now = datetime.now().replace(tzinfo=None)
-        logging.debug(f"Current time: {now}")  # Debug: Print the current time
+        logging.info(f"Current time: {now}")  # Debug: Print the current time
 
         async with db_pool.acquire() as conn:
             # Fetch reminders that are due
@@ -122,7 +122,7 @@ async def check_reminders():
                 "SELECT id, discord_id, note FROM reminders WHERE reminder_time <= $1",
                 now
             )
-            logging.debug(f"Found {len(rows)} reminders due")  # Debug: Print the number of reminders found
+            logging.info(f"Found {len(rows)} reminders due")  # Debug: Print the number of reminders found
 
             for row in rows:
                 user_id = row["discord_id"]
@@ -140,7 +140,7 @@ async def check_reminders():
 
                 # Delete the reminder after sending it
                 await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
-                logging.debug(f"Deleted reminder {reminder_id}")  # Debug: Log deletion message
+                logging.info(f"Deleted reminder {reminder_id}")  # Debug: Log deletion message
 
         await asyncio.sleep(60)  # Check every 60 seconds
 
