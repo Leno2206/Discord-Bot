@@ -247,4 +247,17 @@ def get_bot_status():
     is_running = "true" in result.stdout
     return {"status": "online" if is_running else "offline"}
 if __name__ == "__main__":
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS reminders (
+                id SERIAL PRIMARY KEY,
+                discord_id VARCHAR(50) NOT NULL,
+                note TEXT NOT NULL,
+                reminder_time TIMESTAMP NOT NULL
+            )
+        """)
+        conn.commit()
+        conn.close()
     app.run(host="0.0.0.0", port=187, debug=True)
