@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
       POSTGRES_DB: notesdb
+      TZ: Europe/Berlin 
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro 
@@ -21,6 +22,7 @@ services:
     environment:
       - DISCORD_TOKEN=MTM1MTE1MjQ5ODk2NjI2NTg5Ng.GUzsLf.14bazwkuNM8ilPYlhj_zigTkF3LwDiyguWokoI
       - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
+      - TZ=Europe/Berlin 
     volumes:
       - /etc/localtime:/etc/localtime:ro  # Synchronisiert die Zeitzone mit dem Host
       - /etc/timezone:/etc/timezone:ro    # Synchronisiert die Zeitzoneninformationen mit dem Host
@@ -33,6 +35,7 @@ services:
       - postgres-db
     environment:
       - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
+      - TZ=Europe/Berlin 
     ports:
       - "187:187"
     volumes:
