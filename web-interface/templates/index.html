@@ -228,6 +228,27 @@
                 <p>Keine Notizen gefunden.</p>
             {% endif %}
         </div>
+        <h2>⏰ Erinnerungen</h2>
+<form action="/add_reminder" method="post">
+    <input type="text" name="reminder" placeholder="Neue Erinnerung..." required>
+    <input type="datetime-local" name="reminder_time" required>
+    <button type="submit">Hinzufügen</button>
+</form>
+
+<div class="reminder-list">
+    {% if reminders %}
+        {% for reminder in reminders %}
+        <div class="reminder-item">
+            <span id="reminder-text-{{ reminder[0] }}">{{ reminder[1] }} ({{ reminder[2] }})</span>
+            <span class="reminder-actions">
+                <a href="{{ url_for('delete_reminder', reminder_id=reminder[0]) }}">🗑️ Löschen</a>
+            </span>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p>Keine Erinnerungen gefunden.</p>
+    {% endif %}
+</div>
     </div>
     
     {% else %}
