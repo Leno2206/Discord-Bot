@@ -102,7 +102,9 @@ async def check_reminders():
     Periodically check the database for reminders that are due and send them to users.
     """
     while True:
-        now = datetime.now(timezone.utc)
+        # Get the current time as offset-naive to match the database
+        now = datetime.now().replace(tzinfo=None)
+
         async with db_pool.acquire() as conn:
             # Fetch reminders that are due
             rows = await conn.fetch(
