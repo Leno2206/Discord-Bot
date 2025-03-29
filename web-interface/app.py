@@ -4,7 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from authlib.integrations.flask_client import OAuth
 from authlib.integrations.base_client.errors import MismatchingStateError
 from requests_oauthlib import OAuth2Session
-
+from datetime import datetime
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Ein Geheimschlüssel für Flask-Session
 app.config['DISCORD_CLIENT_ID'] = '1351152498966265896'  # Deine Discord Client ID
@@ -169,6 +169,39 @@ def delete_note(note_id):
     cursor.execute("DELETE FROM notes WHERE id = %s AND discord_id = %s", (note_id, session['discord_id']))
     conn.commit()
     conn.close()
+    return redirect(url_for("index"))
+
+
+@app.route("/add_reminder", methods=["POST"])
+async def add_reminder():
+    reminder_text = request.form["reminder"]
+    reminder_time = request.form["reminder_time"]
+
+    try:
+        reminder_dt = datetime.strptime(reminder_time, "%Y-%m-%dT%H:%M")
+    except ValueError:
+        return "Ungültiges Zeitformat!", 400
+    conn = get_db_connection()
+    if not conn:
+        flash("Error connecting to the database.", "error")
+        return redirect(url_for("index"))
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
+                           "WEB_USER", reminder_text, reminder_dt)
+
+    return redirect(url_for("index"))
+
+@app.route("/delete_reminder/<int:reminder_id>")
+async def delete_reminder(reminder_id):
+    conn = get_db_connection()
+    if not conn:
+        flash("Error connecting to the database.", "error")
+        return redirect(url_for("index"))
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
+    conn.commit()
+    conn.close()
+
     return redirect(url_for("index"))
 
 import subprocess
