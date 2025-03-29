@@ -8,9 +8,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: notesdb
       TZ: Europe/Berlin 
-    volumes:
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro 
+    volumes: 
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432" 
@@ -23,9 +21,6 @@ services:
       - DISCORD_TOKEN=MTM1MTE1MjQ5ODk2NjI2NTg5Ng.GUzsLf.14bazwkuNM8ilPYlhj_zigTkF3LwDiyguWokoI
       - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
       - TZ=Europe/Berlin 
-    volumes:
-      - /etc/localtime:/etc/localtime:ro  # Synchronisiert die Zeitzone mit dem Host
-      - /etc/timezone:/etc/timezone:ro    # Synchronisiert die Zeitzoneninformationen mit dem Host
     restart: always
 
   web-interface:
@@ -40,8 +35,6 @@ services:
       - "187:187"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/timezone:/etc/timezone:ro
-      - /etc/localtime:/etc/localtime:ro 
     restart: always
 
 volumes:
