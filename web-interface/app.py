@@ -98,6 +98,7 @@ def logout():
 def index():
     user = None
     notes = []
+    reminders = []
     status = False
     
     # Überprüfen, ob der Benutzer angemeldet ist
