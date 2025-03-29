@@ -2,7 +2,15 @@ import nextcord
 import asyncpg
 import os
 import asyncio
+import logging
 from datetime import datetime, timezone
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,  # Set the logging level to DEBUG to see all messages
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]  # Output logs to the console
+)
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -37,8 +45,9 @@ async def setup_database():
 
 @bot.event
 async def on_ready():
-    print(f"Bot is online as {bot.user}")
+    logging.info(f"Bot is online as {bot.user}")
     await setup_database()
+    logging.info("Starting check_reminders task")
     bot.loop.create_task(check_reminders())  # Start the reminder checking loop
 
 @bot.slash_command(name="note", description="Save a note 💬")
@@ -101,10 +110,11 @@ async def check_reminders():
     """
     Periodically check the database for reminders that are due and send them to users.
     """
+    logging.info("check_reminders function started")
     while True:
         # Get the current time as offset-naive to match the database
         now = datetime.now().replace(tzinfo=None)
-        print(f"[DEBUG] Current time: {now}")  # Debug: Print the current time
+        logging.debug(f"Current time: {now}")  # Debug: Print the current time
 
         async with db_pool.acquire() as conn:
             # Fetch reminders that are due
@@ -112,7 +122,7 @@ async def check_reminders():
                 "SELECT id, discord_id, note FROM reminders WHERE reminder_time <= $1",
                 now
             )
-            print(f"[DEBUG] Found {len(rows)} reminders due")  # Debug: Print the number of reminders found
+            logging.debug(f"Found {len(rows)} reminders due")  # Debug: Print the number of reminders found
 
             for row in rows:
                 user_id = row["discord_id"]
@@ -124,13 +134,13 @@ async def check_reminders():
                     user = await bot.fetch_user(int(user_id))
                     if user:
                         await user.send(f"⏰ Reminder: {note}")
-                        print(f"[DEBUG] Sent reminder to user {user_id}: {note}")  # Debug: Print success message
+                        logging.info(f"Sent reminder to user {user_id}: {note}")  # Info: Log success message
                 except Exception as e:
-                    print(f"[ERROR] Failed to send reminder to {user_id}: {e}")
+                    logging.error(f"Failed to send reminder to {user_id}: {e}")  # Error: Log failure
 
                 # Delete the reminder after sending it
                 await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
-                print(f"[DEBUG] Deleted reminder {reminder_id}")  # Debug: Print deletion message
+                logging.debug(f"Deleted reminder {reminder_id}")  # Debug: Log deletion message
 
         await asyncio.sleep(60)  # Check every 60 seconds
 
