@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set the logging level to DEBUG to see all messages
+    level=logging.INFO,  # Set the logging level to DEBUG to see all messages
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler()]  # Output logs to the console
 )
