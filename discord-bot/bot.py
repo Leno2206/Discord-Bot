@@ -69,6 +69,7 @@ async def show_notes(interaction: nextcord.Interaction):
     else:
         await interaction.response.send_message("You have no saved notes. 😔")
 
+
 @bot.slash_command(name="add_reminder", description="Add a reminder ⏰")
 async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
     """
@@ -77,9 +78,15 @@ async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
     :param time: The reminder time in ISO format (e.g., "2025-03-30T12:00").
     """
     try:
-        reminder_time = datetime.fromisoformat(time).replace(tzinfo=timezone.utc)
+        reminder_time = datetime.fromisoformat(time)
+
+        # Falls die Zeit bereits eine Zeitzone hat, nicht überschreiben
+        if reminder_time.tzinfo is None:
+            reminder_time = reminder_time.replace(tzinfo=timezone.utc)
     except ValueError:
-        await interaction.response.send_message("Invalid time format! Use ISO format (e.g., 2025-03-30T12:00).", ephemeral=True)
+        await interaction.response.send_message(
+            "Invalid time format! Use ISO format (e.g., 2025-03-30T12:00).", ephemeral=True
+        )
         return
 
     async with db_pool.acquire() as conn:
@@ -87,6 +94,7 @@ async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
             "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
             str(interaction.user.id), text, reminder_time
         )
+
     await interaction.response.send_message(f"Reminder set: {text} at {reminder_time} UTC ✅")
 
 @bot.slash_command(name="show_reminders", description="Show your reminders 📅")
