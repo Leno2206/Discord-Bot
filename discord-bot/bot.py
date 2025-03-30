@@ -81,7 +81,7 @@ async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
         reminder_time = datetime.fromisoformat(time)
 
         # Falls die Zeit bereits eine Zeitzone hat, nicht überschreiben
-        if reminder_time.tzinfo is not tNone:
+        if reminder_time.tzinfo is not None:
             reminder_time = reminder_time.replace(tzinfo=None)
     except ValueError:
         await interaction.response.send_message(
