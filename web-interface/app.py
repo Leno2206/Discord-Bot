@@ -174,35 +174,134 @@ def delete_note(note_id):
     conn.close()
     return redirect(url_for("index"))
 
+@app.route("/permissions")
+def view_permissions():
+    """View permissions granted and received."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+        
+    granted_permissions = []
+    received_permissions = []
+    
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        
+        # Get permissions granted to others
+        cursor.execute(
+            "SELECT id, target_user_id, permission_type FROM user_permissions WHERE user_id = %s",
+            (session['discord_id'],)
+        )
+        granted_permissions = cursor.fetchall()
+        
+        # Get permissions received from others
+        cursor.execute(
+            "SELECT id, user_id, permission_type FROM user_permissions WHERE target_user_id = %s",
+            (session['discord_id'],)
+        )
+        received_permissions = cursor.fetchall()
+        conn.close()
+        
+    return render_template(
+        'permissions.html', 
+        user=session.get('discord_user'),
+        granted_permissions=granted_permissions,
+        received_permissions=received_permissions
+    )
 
 @app.route("/add_reminder", methods=["POST"])
 def add_reminder():
-    """Add a new reminder."""
+    """Add a new reminder for yourself or another user."""
     if 'discord_id' not in session:
         return redirect(url_for('login'))
 
     reminder_text = request.form.get("reminder")
-    date = request.form.get("date")  # Datum aus dem Formular
-    time = request.form.get("time")  # Uhrzeit (inkl. Sekunden) aus dem Formular
+    date = request.form.get("date")
+    time = request.form.get("time")
+    target_user_id = request.form.get("target_user_id")
+    
+    # Default to own user ID if no target specified
+    if not target_user_id:
+        target_user_id = session['discord_id']
+        
+    # If setting for another user, check permissions
+    if target_user_id != session['discord_id']:
+        conn = get_db_connection()
+        if conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM user_permissions WHERE user_id = %s AND target_user_id = %s AND permission_type = %s",
+                (target_user_id, session['discord_id'], "reminders")
+            )
+            permission = cursor.fetchone()
+            conn.close()
+            
+            if not permission:
+                flash("You don't have permission to set reminders for this user", "error")
+                return redirect(url_for("index"))
 
     try:
-        # Kombiniere Datum und Uhrzeit zu einem vollständigen datetime-Objekt
         reminder_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M:%S")
     except ValueError:
-        flash("Ungültiges Datum oder Uhrzeit!", "error")
+        flash("Invalid date or time format", "error")
         return redirect(url_for("index"))
 
     conn = get_db_connection()
     if conn:
-        with conn.cursor() as cursor:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
+            (target_user_id, reminder_text, reminder_time)
+        )
+        conn.commit()
+        conn.close()
+        flash("Reminder added successfully", "success")
+        
+    return redirect(url_for("index"))
+
+@app.route("/add_permission", methods=["POST"])
+def add_permission():
+    """Grant permission to another user to set reminders for you."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+        
+    target_user_id = request.form.get("target_user_id")
+    permission_type = request.form.get("permission_type", "reminders")
+    
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
             cursor.execute(
-                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
-                (session['discord_id'], reminder_text, reminder_time)
+                "INSERT INTO user_permissions (user_id, target_user_id, permission_type) VALUES (%s, %s, %s) ON CONFLICT DO NOTHING",
+                (session['discord_id'], target_user_id, permission_type)
             )
             conn.commit()
-        conn.close()
+            flash("Permission granted successfully", "success")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+        finally:
+            conn.close()
+            
+    return redirect(url_for("index"))
 
-    flash("Erinnerung hinzugefügt!", "success")
+@app.route("/revoke_permission/<target_id>")
+def revoke_permission(target_id):
+    """Revoke permission from another user."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+        
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "DELETE FROM user_permissions WHERE user_id = %s AND target_user_id = %s",
+            (session['discord_id'], target_id)
+        )
+        conn.commit()
+        conn.close()
+        flash("Permission revoked", "success")
+        
     return redirect(url_for("index"))
 
 @app.route("/delete_reminder/<int:reminder_id>")
@@ -250,13 +349,13 @@ if __name__ == "__main__":
     if conn:
         cursor = conn.cursor()
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS reminders (
-                id SERIAL PRIMARY KEY,
-                discord_id VARCHAR(50) NOT NULL,
-                note TEXT NOT NULL,
-                reminder_time TIMESTAMP NOT NULL
-            )
-        """)
+        CREATE TABLE IF NOT EXISTS user_permissions (
+            id SERIAL PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            target_user_id TEXT NOT NULL,
+            permission_type TEXT NOT NULL,
+            UNIQUE(user_id, target_user_id, permission_type)
+        )""")
         conn.commit()
-        conn.close()
+    conn.close()
     app.run(host="0.0.0.0", port=187, debug=True)

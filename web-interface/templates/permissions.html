@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Permissions Management</title>
+    <style>
+        /* Copy styles from index.html and add specific styling for permissions */
+    </style>
+</head>
+<body>
+    <h1>🔐 Permissions Management</h1>
+    
+    {% if user %}
+    <div class="user-info">
+        Logged in as: <strong>{{ user.username }}</strong>
+        <a href="/logout" class="logout-button">Log Out</a>
+    </div>
+    
+    <div class="content-container">
+        <h2>Permissions You've Granted</h2>
+        {% if granted_permissions %}
+            <div class="permission-list">
+                {% for perm in granted_permissions %}
+                <div class="permission-item">
+                    <span>User ID: {{ perm[1] }} - Permission: {{ perm[2] }}</span>
+                    <a href="{{ url_for('revoke_permission', target_id=perm[1]) }}">🗑️ Revoke</a>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>You haven't granted permissions to anyone.</p>
+        {% endif %}
+        
+        <h2>Permissions You've Received</h2>
+        {% if received_permissions %}
+            <div class="permission-list">
+                {% for perm in received_permissions %}
+                <div class="permission-item">
+                    <span>From User ID: {{ perm[1] }} - Permission: {{ perm[2] }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>You haven't received permissions from anyone.</p>
+        {% endif %}
+        
+        <a href="{{ url_for('index') }}" class="back-button">⬅️ Back to Home</a>
+    </div>
+    {% else %}
+    <div class="login-container">
+        <p>Please log in to manage permissions.</p>
+        <a href="/login" class="login-button">
+            <span class="login-icon">🔑</span> Log in with Discord
+        </a>
+    </div>
+    {% endif %}
+</body>
+</html>

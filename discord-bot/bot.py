@@ -51,6 +51,15 @@ async def setup_database():
                 reminder_time TIMESTAMP NOT NULL
             )
         """)
+        await conn.execute("""
+    CREATE TABLE IF NOT EXISTS user_permissions (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        target_user_id TEXT NOT NULL,
+        permission_type TEXT NOT NULL,
+        UNIQUE(user_id, target_user_id, permission_type)
+    )
+""")
 
 @bot.event
 async def on_ready():
@@ -58,6 +67,50 @@ async def on_ready():
     await setup_database()
     logging.info("Starting check_reminders task")
     bot.loop.create_task(check_reminders())  # Start the reminder checking loop
+
+@bot.slash_command(name="revoke_permission", description="Revoke permission from another user ❌")
+async def revoke_permission(interaction: nextcord.Interaction, user_id: str, permission_type: str = "reminders"):
+    """
+    Revoke another user's permission to set reminders for you.
+    
+    :param user_id: The Discord ID of the user to revoke permission from.
+    :param permission_type: The type of permission to revoke (default: reminders).
+    """
+    async with db_pool.acquire() as conn:
+        result = await conn.execute(
+            "DELETE FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
+            str(interaction.user.id), user_id, permission_type
+        )
+        await interaction.response.send_message(f"Permission revoked: User {user_id} can no longer set {permission_type} for you.")
+@bot.slash_command(name="grant_permission", description="Grant permission to another user ✅")
+
+async def grant_permission(interaction: nextcord.Interaction, user_id: str, permission_type: str = "reminders"):
+    """
+    Grant another user permission to set reminders for you.
+    
+    :param user_id: The Discord ID of the user to grant permission to.
+    :param permission_type: The type of permission to grant (default: reminders).
+    """
+    async with db_pool.acquire() as conn:
+        try:
+            # Check if the permission already exists
+            exists = await conn.fetchrow(
+                "SELECT id FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
+                str(interaction.user.id), user_id, permission_type
+            )
+            
+            if exists:
+                await interaction.response.send_message(f"User {user_id} already has permission to set {permission_type} for you.")
+                return
+                
+            # Insert the new permission
+            await conn.execute(
+                "INSERT INTO user_permissions (user_id, target_user_id, permission_type) VALUES ($1, $2, $3)",
+                str(interaction.user.id), user_id, permission_type
+            )
+            await interaction.response.send_message(f"Permission granted: User {user_id} can now set {permission_type} for you.")
+        except Exception as e:
+            await interaction.response.send_message(f"Error: {str(e)}", ephemeral=True)
 
 @bot.slash_command(name="note", description="Save a note 💬")
 async def note(interaction: nextcord.Interaction, text: str):
@@ -80,16 +133,16 @@ async def show_notes(interaction: nextcord.Interaction):
 
 
 @bot.slash_command(name="add_reminder", description="Add a reminder ⏰")
-async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
+async def add_reminder(interaction: nextcord.Interaction, text: str, time: str, target_user_id: str = None):
     """
-    Add a reminder for the user.
+    Add a reminder for yourself or another user.
+    
     :param text: The reminder text.
     :param time: The reminder time in ISO format (e.g., "2025-03-30T12:00").
+    :param target_user_id: Optional Discord ID of the user to set the reminder for.
     """
     try:
         reminder_time = datetime.fromisoformat(time)
-
-        # Falls die Zeit bereits eine Zeitzone hat, nicht überschreiben
         if reminder_time.tzinfo is not None:
             reminder_time = reminder_time.replace(tzinfo=None)
     except ValueError:
@@ -97,15 +150,88 @@ async def add_reminder(interaction: nextcord.Interaction, text: str, time: str):
             "Invalid time format! Use ISO format (e.g., 2025-03-30T12:00).", ephemeral=True
         )
         return
+        
+    user_id = str(interaction.user.id)
+    
+    # If target_user_id is provided, check permissions
+    if target_user_id and target_user_id != user_id:
+        async with db_pool.acquire() as conn:
+            # Check if the user has permission
+            permission = await conn.fetchrow(
+                "SELECT id FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
+                target_user_id, user_id, "reminders"
+            )
+            
+            if not permission:
+                await interaction.response.send_message(
+                    f"You don't have permission to set reminders for user {target_user_id}.", 
+                    ephemeral=True
+                )
+                return
+                
+            reminder_id = await conn.fetchval(
+                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3) RETURNING id",
+                target_user_id, text, reminder_time
+            )
+            
+            await interaction.response.send_message(
+                f"Reminder set for user {target_user_id}: {text} at {reminder_time} UTC ✅"
+            )
+            
+            # Try to notify the target user
+            try:
+                target_user = await bot.fetch_user(int(target_user_id))
+                if target_user:
+                    await target_user.send(
+                        f"User {interaction.user.name} ({user_id}) set a reminder for you: {text} at {reminder_time} UTC"
+                    )
+            except Exception as e:
+                logging.error(f"Failed to notify user {target_user_id}: {e}")
+    else:
+        # Set reminder for self (original functionality)
+        async with db_pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
+                user_id, text, reminder_time
+            )
+        await interaction.response.send_message(f"Reminder set: {text} at {reminder_time} UTC ✅")
 
+@bot.slash_command(name="list_permissions", description="List all permissions ⚙️")
+async def list_permissions(interaction: nextcord.Interaction, direction: str = "granted"):
+    """
+    List all permissions you've granted to others or others have granted to you.
+    
+    :param direction: Either 'granted' (permissions you've given) or 'received' (permissions you've received).
+    """
+    user_id = str(interaction.user.id)
+    
     async with db_pool.acquire() as conn:
-        await conn.execute(
-            "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
-            str(interaction.user.id), text, reminder_time
-        )
+        if direction == "granted":
+            rows = await conn.fetch(
+                "SELECT target_user_id, permission_type FROM user_permissions WHERE user_id = $1",
+                user_id
+            )
+            
+            if not rows:
+                await interaction.response.send_message("You haven't granted permissions to anyone.")
+                return
+                
+            permissions_list = "\n".join([f"User {row['target_user_id']} can set {row['permission_type']} for you" for row in rows])
+            await interaction.response.send_message(f"Permissions you've granted:\n{permissions_list}")
+        else:
+            rows = await conn.fetch(
+                "SELECT user_id, permission_type FROM user_permissions WHERE target_user_id = $1",
+                user_id
+            )
+            
+            if not rows:
+                await interaction.response.send_message("You haven't received permissions from anyone.")
+                return
+                
+            permissions_list = "\n".join([f"You can set {row['permission_type']} for user {row['user_id']}" for row in rows])
 
-    await interaction.response.send_message(f"Reminder set: {text} at {reminder_time} UTC ✅")
-
+            await interaction.response.send_message(f"Permissions you've received:\n{permissions_list}")
+    
 @bot.slash_command(name="show_reminders", description="Show your reminders 📅")
 async def show_reminders(interaction: nextcord.Interaction):
     """
