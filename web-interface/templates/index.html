@@ -239,6 +239,11 @@
             <input type="time" id="time" name="time" step="1" required>
             <button type="submit">Add</button>
         </form>
+        
+        <script>
+            // Set default date to today
+            document.getElementById("date").value = new Date().toISOString().split("T")[0];
+        </script>
 
         <div class="reminder-list">
             {% if reminders %}
