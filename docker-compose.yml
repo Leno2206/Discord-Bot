@@ -4,23 +4,23 @@ services:
     container_name: postgres-db
     restart: always
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: notesdb
-      TZ: Europe/Berlin 
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TIMEZONE}
     volumes: 
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432" 
+      - "${DATABASE_PORT}:5432" 
   discord-bot:
     build: ./discord-bot
     container_name: discord-bot
     depends_on:
       - postgres-db
     environment:
-      - DISCORD_TOKEN=MTM1MTE1MjQ5ODk2NjI2NTg5Ng.GUzsLf.14bazwkuNM8ilPYlhj_zigTkF3LwDiyguWokoI
-      - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
-      - TZ=Europe/Berlin 
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
     restart: always
 
   web-interface:
@@ -29,10 +29,10 @@ services:
     depends_on:
       - postgres-db
     environment:
-      - DATABASE_URL=postgresql://user:password@postgres-db:5432/notesdb
-      - TZ=Europe/Berlin 
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
     ports:
-      - "187:187"
+      - "${WEB_PORT}:${WEB_PORT}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     restart: always
