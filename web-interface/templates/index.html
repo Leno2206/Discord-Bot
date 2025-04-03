@@ -243,6 +243,13 @@
         <script>
             // Set default date to today
             document.getElementById("date").value = new Date().toISOString().split("T")[0];
+        
+            // Set default time to 10 minutes in the future
+            const now = new Date();
+            now.setMinutes(now.getMinutes() + 10); // Add 10 minutes
+            const hours = String(now.getHours()).padStart(2, '0'); // Ensure two digits
+            const minutes = String(now.getMinutes()).padStart(2, '0'); // Ensure two digits
+            document.getElementById("time").value = `${hours}:${minutes}`;
         </script>
 
         <div class="reminder-list">
