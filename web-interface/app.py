@@ -358,4 +358,4 @@ if __name__ == "__main__":
         )""")
         conn.commit()
     conn.close()
-    app.run(host="0.0.0.0", port=80, debug=True)
+    app.run(host="0.0.0.0", port=187, debug=True)
