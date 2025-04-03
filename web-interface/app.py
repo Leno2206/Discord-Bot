@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Ein Geheimschlüssel für Flask-Session
 app.config['DISCORD_CLIENT_ID'] = '1351152498966265896'  # Deine Discord Client ID
 app.config['DISCORD_CLIENT_SECRET'] = 'xoKG1lMT2Ljzzxngu3mIl7VEeWal9HoA'  # Dein Discord Client Secret
-app.config['DISCORD_REDIRECT_URI'] = 'https://192.168.178.53/auth' 
+app.config['DISCORD_REDIRECT_URI'] = 'https://lenosnetzwerk.servebeer.com:361/auth' 
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -358,4 +358,4 @@ if __name__ == "__main__":
         )""")
         conn.commit()
     conn.close()
-    app.run(host="0.0.0.0", port=187, debug=True)
+    app.run(host="0.0.0.0", port=80, debug=True)
