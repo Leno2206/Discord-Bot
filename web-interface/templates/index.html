@@ -8,8 +8,27 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            text-align: center;
-            margin-top: 50px;
+            margin: 0;
+            padding: 0;
+        }
+        /* Navbar Styling */
+        .navbar {
+            background-color: #7289DA;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            font-size: 1.2em;
+        }
+        .navbar a:hover {
+            background-color: #5b6eae;
+            border-radius: 5px;
         }
         .status {
             font-size: 2em;
@@ -68,6 +87,23 @@
             margin-left: 10px;
             cursor: pointer;
         }
+        .reminder-list {
+            margin-top: 30px;
+            text-align: left;
+            display: inline-block;
+            width: 80%;
+            max-width: 600px;
+        }
+        .reminder-item {
+            background: #f4f4f4;
+            padding: 10px;
+            margin: 5px;
+            border-radius: 5px;
+        }
+        .note-actions a {
+            margin-left: 10px;
+            cursor: pointer;
+        }
         /* Modal Styles */
         .modal {
             display: none;
@@ -93,15 +129,6 @@
             font-size: 24px;
             cursor: pointer;
         }
-        .logout-button {
-            background-color: #7289DA;
-            padding: 8px 15px;
-            border-radius: 4px;
-            color: white;
-            text-decoration: none;
-            font-size: 0.9em;
-            margin-left: 15px;
-        }
         .login-button {
             display: inline-block;
             background-color: #7289DA;
@@ -122,18 +149,17 @@
         }
         .content-container {
             margin-top: 30px;
-        }
-        .login-container {
-            margin: 50px auto;
-            max-width: 500px;
-            padding: 20px;
-            background-color: #f9f9f9;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            padding: 0 20px;
         }
     </style>
 </head>
 <body>
+    <!-- Navbar -->
+    <div class="navbar">
+        <a href="#notizen">Notizen</a>
+        <a href="#erinnerungen">Erinnerungen</a>
+    </div>
+
     <h1>Discord Bot Status</h1>
     
     {% if user %}
@@ -205,8 +231,8 @@
         }, 10000); // Nach 10 Sekunden wieder aktivieren
     }
     </script>
-        <div id="message"></div>
-
+    
+    <div class="content-container" id="notizen">
         <h2>📝 Notizen</h2>
         <form action="/add_note" method="post">
             <input type="text" name="note" placeholder="Neue Notiz..." required>
@@ -228,29 +254,20 @@
                 <p>Keine Notizen gefunden.</p>
             {% endif %}
         </div>
+    </div>
+
+    <div class="content-container" id="erinnerungen">
         <h2>⏰ Erinnerungen</h2>
         <form action="/add_reminder" method="post">
-            <input type="text" name="reminder" placeholder="New reminder..." required>
+            <input type="text" name="reminder" placeholder="Neue Erinnerung..." required>
             <label for="target_user_id">User ID (optional):</label>
-            <input type="text" name="target_user_id" placeholder="Set for another user ID">
-            <label for="date">Date:</label>
+            <input type="text" name="target_user_id" placeholder="Setze für eine andere User ID">
+            <label for="date">Datum:</label>
             <input type="date" id="date" name="date" required>
-            <label for="time">Time:</label>
+            <label for="time">Zeit:</label>
             <input type="time" id="time" name="time" step="1" required>
-            <button type="submit">Add</button>
+            <button type="submit">Hinzufügen</button>
         </form>
-        
-        <script>
-            // Set default date to today
-            document.getElementById("date").value = new Date().toISOString().split("T")[0];
-        
-            // Set default time to 10 minutes in the future
-            const now = new Date();
-            now.setMinutes(now.getMinutes() + 10); // Add 10 minutes
-            const hours = String(now.getHours()).padStart(2, '0'); // Ensure two digits
-            const minutes = String(now.getMinutes()).padStart(2, '0'); // Ensure two digits
-            document.getElementById("time").value = `${hours}:${minutes}`;
-        </script>
 
         <div class="reminder-list">
             {% if reminders %}
@@ -259,7 +276,7 @@
                     <span id="reminder-text-{{ reminder[0] }}">
                         {{ reminder[1] }} - {{ reminder[2].strftime('%Y-%m-%d %H:%M:%S') }}
                     </span>
-                    <span class="reminder-actions">
+                    <span class="note-actions">
                         <a href="{{ url_for('delete_reminder', reminder_id=reminder[0]) }}">🗑️ Löschen</a>
                     </span>
                 </div>
@@ -269,99 +286,13 @@
             {% endif %}
         </div>
     </div>
-    
-    <h2>🔐 Permission Management</h2>
-    <form action="/add_permission" method="post">
-        <input type="text" name="target_user_id" placeholder="Discord user ID..." required>
-        <input type="hidden" name="permission_type" value="reminders">
-        <button type="submit">Grant Permission</button>
-    </form>
-    <a href="/permissions">View All Permissions</a>
 
     {% else %}
-    <!-- Nicht angemeldeter Benutzer - Login-Bereich -->
-    <div class="login-container">
-        <h2>Willkommen bei der Discord Bot Verwaltung!!</h2>
-        <p>Um den Bot zu verwalten und Notizen zu sehen, melde dich bitte mit deinem Discord-Konto an.</p>
-        <a href="/login" class="login-button">
-            <span class="login-icon">🔑</span> Mit Discord anmelden
-        </a>
-    </div>
+    <!-- Nicht angemeldeter Benutzer -->
+    <a href="{{ login_url }}" class="login-button">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/7/71/Discord_logo.svg" class="login-icon" alt="Login-Icon">
+        Mit Discord anmelden
+    </a>
     {% endif %}
-
-    <!-- Modal for Editing Notes -->
-    <div id="editModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeEditModal()">&times;</span>
-            <h2>✏️ Notiz bearbeiten</h2>
-            <form id="editForm">
-                <input type="hidden" id="editNoteId">
-                <input type="text" id="editNoteText" required>
-                <button type="submit">Speichern</button>
-            </form>
-        </div>
-    </div>
-
-    <script>
-        function restartBot() {
-            document.querySelector(".status").classList.add("offline");
-            document.querySelector(".status").textContent = "Bot ist Offline";
-
-            fetch("/restart", { method: "POST" })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById("message").textContent = data.message;
-                } else {
-                    document.getElementById("message").textContent = "Fehler beim Stoppen des Bots.";
-                }
-            })
-            .catch(error => {
-                document.getElementById("message").textContent = "Fehler: " + error;
-            });
-        }
-
-        // Open edit modal
-        function openEditModal(noteId, noteText) {
-            document.getElementById("editNoteId").value = noteId;
-            document.getElementById("editNoteText").value = noteText;
-            document.getElementById("editModal").style.display = "block";
-        }
-
-        // Close edit modal
-        function closeEditModal() {
-            document.getElementById("editModal").style.display = "none";
-        }
-
-        // AJAX Form Submission for Editing Notes
-        document.getElementById("editForm").addEventListener("submit", function(event) {
-            event.preventDefault();
-            const noteId = document.getElementById("editNoteId").value;
-            const newText = document.getElementById("editNoteText").value;
-
-            fetch(`/edit_note/${noteId}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: `note=${encodeURIComponent(newText)}`
-            })
-            .then(response => {
-                if (response.ok) {
-                    document.getElementById(`note-text-${noteId}`).textContent = newText;
-                    closeEditModal();
-                } else {
-                    alert("Fehler beim Speichern!");
-                }
-            });
-        });
-
-        // Close modal if clicked outside
-        window.onclick = function(event) {
-            const modal = document.getElementById("editModal");
-            if (event.target === modal) {
-                closeEditModal();
-            }
-        };
-    </script>
-
 </body>
 </html>
