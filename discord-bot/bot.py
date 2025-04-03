@@ -4,7 +4,16 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timezone
+# Add this to your bot.py file or main Python script
+import os
 
+# Print token for debugging (remove this after fixing the issue)
+token = os.getenv("DISCORD_TOKEN")
+print(f"Token length: {len(token) if token else 'None'}")
+print(f"Token first 10 chars: {token[:10] if token else 'None'}")
+
+# Make sure to strip any whitespace
+token = token.strip() if token else None
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to DEBUG to see all messages
