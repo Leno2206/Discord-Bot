@@ -295,7 +295,7 @@ async def check_reminders():
         async with db_pool.acquire() as conn:
             # Fetch the next due reminder
             row = await conn.fetchrow(
-                "SELECT id, discord_id, note, reminder_time FROM reminders WHERE reminder_time > $1 ORDER BY reminder_time ASC LIMIT 1",
+                "SELECT id, discord_id, note, reminder_time FROM reminders WHERE reminder_time <= $1 ORDER BY reminder_time ASC LIMIT 1",
                 now
             )
 
