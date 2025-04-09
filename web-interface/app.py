@@ -5,6 +5,7 @@ from authlib.integrations.flask_client import OAuth
 from authlib.integrations.base_client.errors import MismatchingStateError
 from requests_oauthlib import OAuth2Session
 from datetime import datetime
+import logging
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Ein Geheimschlüssel für Flask-Session
 app.config['DISCORD_CLIENT_ID'] = '1351152498966265896'  # Deine Discord Client ID
@@ -16,7 +17,11 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 OAUTH2_CLIENT_ID = app.config['DISCORD_CLIENT_ID']
 OAUTH2_CLIENT_SECRET = app.config['DISCORD_CLIENT_SECRET']
 OAUTH2_REDIRECT_URI = app.config['DISCORD_REDIRECT_URI']
-
+logging.basicConfig(
+    level=logging.INFO,  # Set the logging level to DEBUG to see all messages
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]  # Output logs to the console
+)
 API_BASE_URL = 'https://discord.com/api'
 AUTHORIZATION_BASE_URL = f"{API_BASE_URL}/oauth2/authorize"
 TOKEN_URL = f"{API_BASE_URL}/oauth2/token"
@@ -254,6 +259,7 @@ def add_reminder():
             "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
             (target_user_id, reminder_text, reminder_time)
         )
+        logging.info(reminder_text, reminder_time)
         conn.commit()
         conn.close()
         flash("Reminder added successfully", "success")
