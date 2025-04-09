@@ -217,6 +217,7 @@ def view_permissions():
 
 @app.route("/add_reminder", methods=["POST"])
 def add_reminder():
+    logging.info("HIIIII")
     """Add a new reminder for yourself or another user."""
     if 'discord_id' not in session:
         return redirect(url_for('login'))
