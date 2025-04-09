@@ -4,8 +4,13 @@ import os
 import asyncio
 import logging
 from datetime import datetime, timezone
-# Add this to your bot.py file or main Python script
-import os
+# Neue Importe für die API-Funktionalität
+import uvicorn
+from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi.security.api_key import APIKeyHeader
+from starlette.status import HTTP_403_FORBIDDEN
+import threading
+from typing import List, Dict
 
 # Print token for debugging (remove this after fixing the issue)
 token = os.getenv("DISCORD_TOKEN")
@@ -24,11 +29,50 @@ logging.basicConfig(
 TOKEN = os.getenv("DISCORD_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-bot = nextcord.Client(intents=nextcord.Intents.default())
+API_KEY = os.getenv("API_KEY", "your-secret-api-key")  # In Produktion ändern
+API_KEY_NAME = "X-API-Key"
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
+app=FastAPI()
+
+intents=nextcord.Intents.default()
+intents.members=True
+bot = nextcord.Client(intents=intents)
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == API_KEY:
+        return api_key_header
+    raise HTTPException(
+        status_code=HTTP_403_FORBIDDEN, detail="Invalid API key"
+    )
 async def create_db_pool():
     return await asyncpg.create_pool(DATABASE_URL)
-
+@app.get("/guild-members/{guild_id}", response_model=List[Dict])
+async def get_guild_members(guild_id: int, api_key: str = Depends(get_api_key)):
+    try:
+        # Guild ID zu int konvertieren (falls noch nicht)
+        guild_id = int(guild_id)
+        
+        # Guild Objekt abrufen
+        guild = bot.get_guild(guild_id)
+        if not guild:
+            raise HTTPException(status_code=404, detail=f"Guild with ID {guild_id} not found")
+        
+        # Mitglieder abrufen
+        members = []
+        for member in guild.members:
+            members.append({
+                "id": str(member.id),
+                "username": str(member),
+                "display_name": member.display_name,
+                "avatar_url": str(member.display_avatar.url) if member.display_avatar else None,
+                "bot": member.bot,
+                "roles": [{"id": role.id, "name": role.name} for role in member.roles if role.name != "@everyone"]
+            })
+        
+        return members
+    except Exception as e:
+        logging.error(f"Error in get_guild_members: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 async def setup_database():
     global db_pool
     db_pool = await create_db_pool()
@@ -294,4 +338,19 @@ async def check_reminders():
                 logging.info("No reminders found, sleeping for 10 seconds")
                 await asyncio.sleep(10)
 
-bot.run(TOKEN)
+def run_api():
+    uvicorn.run(app, host="0.0.0.0", port=5001)
+
+# Die main-Funktion muss angepasst werden, um auch die API zu starten
+def main():
+    # FastAPI in einem separaten Thread starten
+    api_thread = threading.Thread(target=run_api)
+    api_thread.daemon = True
+    api_thread.start()
+    logging.info("API server started on port 5001")
+    
+    # Discord Bot starten
+    bot.run(TOKEN)
+
+if __name__ == "__main__":
+    main()

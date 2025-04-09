@@ -2,3 +2,5 @@ nextcord
 asyncpg
 eventlet
 aiohttp
+uvicorn
+fastapi
