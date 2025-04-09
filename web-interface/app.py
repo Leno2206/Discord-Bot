@@ -114,6 +114,7 @@ def index():
             notes = cursor.fetchall()
             cursor.execute("SELECT id, note, reminder_time FROM reminders WHERE discord_id = %s", (user['id'],))
             reminders = cursor.fetchall()
+            print(reminders)
             conn.close()
             status = True
     
