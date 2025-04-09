@@ -11,6 +11,7 @@ from fastapi.security.api_key import APIKeyHeader
 from starlette.status import HTTP_403_FORBIDDEN
 import threading
 from typing import List, Dict
+from fastapi import Response
 GUILD_ID = "1148225365400109148"
 # Print token for debugging (remove this after fixing the issue)
 token = os.getenv("DISCORD_TOKEN")
@@ -46,33 +47,22 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
     )
 async def create_db_pool():
     return await asyncpg.create_pool(DATABASE_URL)
-@app.get("/guild-members/{guild_id}", response_model=List[Dict])
-async def get_guild_members(guild_id: int, api_key: str = Depends(get_api_key)):
-    try:
-        # Guild ID zu int konvertieren (falls noch nicht)
-        guild_id = int(guild_id)
-        
-        # Guild Objekt abrufen
-        guild = bot.get_guild(guild_id)
-        if not guild:
-            raise HTTPException(status_code=404, detail=f"Guild with ID {guild_id} not found")
-        
-        # Mitglieder abrufen
-        members = []
-        for member in guild.members:
+
+@app.get('/api/discord/members')
+async def get_discord_members(api_key: str = Depends(get_api_key)):
+    guild = bot.get_guild(int(GUILD_ID))
+    if not guild:
+        raise HTTPException(status_code=404, detail="Guild not found")
+    
+    members = []
+    for member in guild.members:
+        if not member.bot:
             members.append({
                 "id": str(member.id),
-                "username": str(member),
-                "display_name": member.display_name,
-                "avatar_url": str(member.display_avatar.url) if member.display_avatar else None,
-                "bot": member.bot,
-                "roles": [{"id": role.id, "name": role.name} for role in member.roles if role.name != "@everyone"]
+                "name": member.display_name
             })
-        
-        return members
-    except Exception as e:
-        logging.error(f"Error in get_guild_members: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    
+    return members
 async def setup_database():
     global db_pool
     db_pool = await create_db_pool()
