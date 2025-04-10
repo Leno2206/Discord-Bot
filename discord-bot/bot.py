@@ -49,18 +49,15 @@ async def create_db_pool():
     return await asyncpg.create_pool(DATABASE_URL)
 
 @app.get('/api/discord/members')
-async def get_discord_members(api_key: str = Depends(get_api_key)):
+async def get_discord_members():
     guild = bot.get_guild(int(GUILD_ID))
     if not guild:
         raise HTTPException(status_code=404, detail="Guild not found")
     
-    members = []
-    for member in guild.members:
-        if not member.bot:
-            members.append({
-                "id": str(member.id),
-                "name": member.display_name
-            })
+    members = [
+        {"id": str(m.id), "name": m.display_name}
+        for m in guild.members if not m.bot
+    ]
     
     return members
 async def setup_database():
@@ -329,7 +326,7 @@ async def check_reminders():
                 await asyncio.sleep(10)
 
 def run_api():
-    uvicorn.run(app, host="0.0.0.0", port=5001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 # Die main-Funktion muss angepasst werden, um auch die API zu starten
 def main():
@@ -337,7 +334,7 @@ def main():
     api_thread = threading.Thread(target=run_api)
     api_thread.daemon = True
     api_thread.start()
-    logging.info("API server started on port 5001")
+    logging.info("API server started on port 8000")
     
     # Discord Bot starten
     bot.run(TOKEN)

@@ -6,6 +6,9 @@ from authlib.integrations.base_client.errors import MismatchingStateError
 from requests_oauthlib import OAuth2Session
 from datetime import datetime
 import logging
+
+import requests
+import jsonify
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Ein Geheimschlüssel für Flask-Session
 app.config['DISCORD_CLIENT_ID'] = '1351152498966265896'  # Deine Discord Client ID
@@ -122,7 +125,10 @@ def index():
             print(reminders)
             conn.close()
             status = True
-    
+        response = requests.get("http://discord-bot:8000/api/discord/members")
+        logging.error(jsonify(response.json()))
+        print(jsonify(response.json()))
+        return jsonify(response.json())
     # Render template mit Kontext-Daten
     return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders)
 
