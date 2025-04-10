@@ -131,8 +131,8 @@ def index():
 
             # Query: welche `target_user_id`s hat der aktuelle user berechtigt
             cursor.execute("""
-                SELECT target_user_id FROM user_permissions
-                WHERE user_id = %s AND permission_type = 'reminders'
+                SELECT user_id FROM user_permissions
+                WHERE target_user_id = %s AND permission_type = 'reminders'
             """, (discord_id,))
             
             allowed_ids = {row[0] for row in cursor.fetchall()}
