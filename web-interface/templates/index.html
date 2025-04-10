@@ -281,7 +281,7 @@
             <!-- Dropdown for selecting the user -->
             <label for="target_user_id">Set reminder for user:</label>
             <select name="target_user_id" id="target_user_id">
-                <option value="" disabled selected>Select a user (optional)</option>
+                <option value="{{user.id}}"  selected>Self</option>
                 {% for member in allowed_members %}
                     <option value="{{ member.id }}">{{ member.name }}</option>
                 {% endfor %}
