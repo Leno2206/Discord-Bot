@@ -236,21 +236,6 @@
     }
     </script>
     <!-- Dropdown mit den berechtigten Discord-Mitgliedern -->
-<select id="userDropdown">
-    {% for member in allowed_members %}
-        <option value="{{ member.id }}">{{ member.name }}</option>
-    {% endfor %}
-</select>
-
-<!-- Optional: JavaScript, falls du damit etwas tun möchtest -->
-<script>
-    // Hier kannst du JavaScript hinzufügen, um mit den ausgewählten Mitgliedern zu interagieren
-    const dropdown = document.getElementById('userDropdown');
-    dropdown.addEventListener('change', function () {
-        const selectedUserId = this.value;
-        console.log('Ausgewählter Benutzer:', selectedUserId);
-    });
-</script>
         <div id="message"></div>
 
         <h2>📝 Notizen</h2>
