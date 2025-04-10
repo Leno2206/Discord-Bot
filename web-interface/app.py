@@ -102,10 +102,6 @@ def logout():
     session.clear()  # Clear the entire session
     return redirect(url_for('index'))
 
-Angepasster Code in app.py:
-python
-Copy
-Edit
 @app.route('/')
 def index():
     user = None
