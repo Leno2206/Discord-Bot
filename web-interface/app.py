@@ -136,7 +136,8 @@ def index():
             """, (discord_id,))
             
             allowed_ids = {row[0] for row in cursor.fetchall()}
-
+            logging.info(allowed_ids)
+            logging.info(all_members)
             # Nur die Mitglieder filtern, für die Berechtigung vorliegt
             allowed_members = [
                 m for m in all_members
