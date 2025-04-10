@@ -277,14 +277,25 @@
         <h2>⏰ Erinnerungen</h2>
         <form action="/add_reminder" method="post">
             <input type="text" name="reminder" placeholder="New reminder..." required>
-            <label for="target_user_id">User ID (optional):</label>
-            <input type="text" name="target_user_id" placeholder="Set for another user ID">
+        
+            <!-- Dropdown for selecting the user -->
+            <label for="target_user_id">Set reminder for user:</label>
+            <select name="target_user_id" id="target_user_id">
+                <option value="" disabled selected>Select a user (optional)</option>
+                {% for member in allowed_members %}
+                    <option value="{{ member.id }}">{{ member.name }}</option>
+                {% endfor %}
+            </select>
+        
             <label for="date">Date:</label>
             <input type="date" id="date" name="date" required>
+        
             <label for="time">Time:</label>
             <input type="time" id="time" name="time" step="1" required>
+        
             <button type="submit">Add</button>
         </form>
+        
         
         <script>
             // Set default date to today
@@ -319,20 +330,11 @@
     </div>
     
     <h2>🔐 Permission Management</h2>
-
     <form action="/add_permission" method="post">
-        <label for="target_user_id">Select User to Grant Permission:</label>
-        <select name="target_user_id" id="target_user_id" required>
-            <option value="" disabled selected>Select a user...</option>
-            {% for member in allowed_members %}
-                <option value="{{ member.id }}">{{ member.name }}</option>
-            {% endfor %}
-        </select>
-        
+        <input type="text" name="target_user_id" placeholder="Discord user ID..." required>
         <input type="hidden" name="permission_type" value="reminders">
         <button type="submit">Grant Permission</button>
     </form>
-    
     <a href="/permissions">View All Permissions</a>
 
     {% else %}
