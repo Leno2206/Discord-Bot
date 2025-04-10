@@ -102,13 +102,18 @@ def logout():
     session.clear()  # Clear the entire session
     return redirect(url_for('index'))
 
+Angepasster Code in app.py:
+python
+Copy
+Edit
 @app.route('/')
 def index():
     user = None
     notes = []
     reminders = []
     status = False
-    
+    allowed_members = []
+
     # Überprüfen, ob der Benutzer angemeldet ist
     if 'discord_id' in session:
         discord_id = session['discord_id']
@@ -123,14 +128,30 @@ def index():
             cursor.execute("SELECT id, note, reminder_time FROM reminders WHERE discord_id = %s", (user['id'],))
             reminders = cursor.fetchall()
             print(reminders)
+            
+            # Discord-Mitglieder abrufen vom Bot (docker-intern über Container-Name)
+            res = requests.get("http://discord-bot:8000/api/discord/members")
+            all_members = res.json()  # [{id: ..., name: ...}, ...]
+
+            # Query: welche `target_user_id`s hat der aktuelle user berechtigt
+            cursor.execute("""
+                SELECT target_user_id FROM user_permissions
+                WHERE user_id = %s AND permission_type = 'reminders'
+            """, (discord_id,))
+            
+            allowed_ids = {row[0] for row in cursor.fetchall()}
+
+            # Nur die Mitglieder filtern, für die Berechtigung vorliegt
+            allowed_members = [
+                m for m in all_members
+                if m["id"] in allowed_ids
+            ]
+
             conn.close()
             status = True
-        response = requests.get("http://discord-bot:8000/api/discord/members")
-        logging.error(response.json())
-        logging.info(response.json())
-        print(response.json())
-    # Render template mit Kontext-Daten
-    return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders)
+
+    # Render template mit Kontext-Daten und den berechtigten Discord-Mitgliedern
+    return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders, allowed_members=allowed_members)
 
 @app.route("/add_note", methods=["POST"])
 def add_note():
