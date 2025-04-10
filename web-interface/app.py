@@ -127,8 +127,8 @@ def index():
             status = True
         response = requests.get("http://discord-bot:8000/api/discord/members")
         logging.error(response.json())
+        logging.info(response.json())
         print(response.json())
-        return jsonify(response.json())
     # Render template mit Kontext-Daten
     return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders)
 
