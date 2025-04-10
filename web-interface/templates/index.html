@@ -319,11 +319,20 @@
     </div>
     
     <h2>🔐 Permission Management</h2>
+
     <form action="/add_permission" method="post">
-        <input type="text" name="target_user_id" placeholder="Discord user ID..." required>
+        <label for="target_user_id">Select User to Grant Permission:</label>
+        <select name="target_user_id" id="target_user_id" required>
+            <option value="" disabled selected>Select a user...</option>
+            {% for member in allowed_members %}
+                <option value="{{ member.id }}">{{ member.name }}</option>
+            {% endfor %}
+        </select>
+        
         <input type="hidden" name="permission_type" value="reminders">
         <button type="submit">Grant Permission</button>
     </form>
+    
     <a href="/permissions">View All Permissions</a>
 
     {% else %}

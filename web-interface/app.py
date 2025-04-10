@@ -149,7 +149,6 @@ def index():
 
     # Render template mit Kontext-Daten und den berechtigten Discord-Mitgliedern
     return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders, allowed_members=allowed_members)
-
 @app.route("/add_note", methods=["POST"])
 def add_note():
     """Adds a new note."""
