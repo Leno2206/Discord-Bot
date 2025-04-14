@@ -1,1 +1,17 @@
-hi
+<div class="board">
+    {% for column in columns %}
+      <div class="column">
+        <h2>{{ column.name }}</h2>
+        <ul>
+          {% for task in column.tasks %}
+            <li>{{ task.title }}</li>
+          {% endfor %}
+        </ul>
+        <form action="{{ url_for('add_task', column_id=column.id) }}" method="post">
+          <input type="text" name="title" placeholder="Neue Aufgabe">
+          <button type="submit">➕</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+  
