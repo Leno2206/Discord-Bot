@@ -101,7 +101,9 @@ def logout():
     """Logout the user by clearing the session."""
     session.clear()  # Clear the entire session
     return redirect(url_for('index'))
-
+@app.route('/tasks')
+def tasks():
+    return render_template('tasks.html')
 @app.route('/')
 def index():
     user = None
