@@ -127,20 +127,21 @@ def tasks():
     for col_id, name, position in cursor.fetchall():
         # Aufgaben für jede Spalte abrufen
         cursor.execute("""
-            SELECT id, title, description, position
+            SELECT id, title, description, is_recurring, position
             FROM taskboard_tasks
             WHERE column_id = %s
             ORDER BY position
         """, (col_id,))
         
         tasks = [
-            {
-                'id': task_id,
-                'title': title,
-                'description': desc
-            }
-            for task_id, title, desc, pos in cursor.fetchall()
-        ]
+    {
+        'id': task_id,
+        'title': title,
+        'description': desc,
+        'is_recurring': is_recurring
+    }
+    for task_id, title, desc, is_recurring in cursor.fetchall()
+]
         
         columns.append({
             'id': col_id,
@@ -684,6 +685,83 @@ def revoke_permission(target_id):
         flash("Permission revoked", "success")
         
     return redirect(url_for("index"))
+@app.route("/copy_task", methods=["POST"])
+def copy_task():
+    if 'discord_id' not in session:
+        return jsonify({'success': False, 'message': 'Nicht angemeldet'}), 401
+
+    data = request.get_json()
+    original_task_id = data.get("task_id")
+    target_column_id = data.get("column_id")
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Datenbankfehler'}), 500
+
+    cursor = conn.cursor()
+    # Original-Task laden
+    cursor.execute("""
+        SELECT t.title, t.description, t.is_recurring
+        FROM taskboard_tasks t
+        JOIN taskboard_columns c ON t.column_id = c.id
+        WHERE t.id = %s AND c.discord_id = %s
+    """, (original_task_id, session['discord_id']))
+    task = cursor.fetchone()
+
+    if not task:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Aufgabe nicht gefunden oder keine Berechtigung'}), 404
+
+    title, description, is_recurring = task
+
+    # Neue Position
+    cursor.execute("SELECT COALESCE(MAX(position), -1) FROM taskboard_tasks WHERE column_id = %s", (target_column_id,))
+    max_position = cursor.fetchone()[0]
+
+    # Kopieren
+    cursor.execute("""
+        INSERT INTO taskboard_tasks (column_id, title, description, is_recurring, position)
+        VALUES (%s, %s, %s, %s, %s) RETURNING id
+    """, (target_column_id, title, description, is_recurring, max_position + 1))
+    new_task_id = cursor.fetchone()[0]
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'new_task_id': new_task_id})
+
+@app.route("/toggle_recurring_task", methods=["POST"])
+def toggle_recurring_task():
+    if 'discord_id' not in session:
+        return jsonify({'success': False, 'message': 'Nicht angemeldet'}), 401
+
+    data = request.get_json()
+    task_id = data.get("task_id")
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Datenbankfehler'}), 500
+
+    cursor = conn.cursor()
+    # Prüfen, ob Task dem User gehört
+    cursor.execute("""
+        SELECT t.is_recurring
+        FROM taskboard_tasks t
+        JOIN taskboard_columns c ON t.column_id = c.id
+        WHERE t.id = %s AND c.discord_id = %s
+    """, (task_id, session['discord_id']))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Keine Berechtigung'}), 403
+
+    current_state = result[0]
+    new_state = not current_state
+
+    cursor.execute("UPDATE taskboard_tasks SET is_recurring = %s WHERE id = %s", (new_state, task_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'is_recurring': new_state})
 
 @app.route("/delete_reminder/<int:reminder_id>")
 def delete_reminder(reminder_id):
