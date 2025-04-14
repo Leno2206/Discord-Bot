@@ -111,6 +111,11 @@
 .task.recurring {
     border-left: 3px solid #4caf50;
 }
+.task.completed {
+    text-decoration: line-through;
+    opacity: 0.7;
+    background-color: #f5f5f5;
+}
 .task.placeholder {
     background-color: #f9f9f9;
     border: 2px dashed #ccc;
@@ -162,8 +167,9 @@
     border-radius: 3px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     cursor: move;
+    position: relative;
 }
-.recurring-toggle {
+.recurring-toggle, .completed-toggle {
     display: flex;
     align-items: center;
     cursor: pointer;
@@ -214,6 +220,26 @@
         padding: 5px 10px;
         cursor: pointer;
     }
+
+    /* New Styles for Task Actions */
+    .delete-task {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        color: #d9534f;
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px;
+        opacity: 0.6;
+    }
+    .delete-task:hover {
+        opacity: 1;
+    }
+    .task:hover .delete-task {
+        display: block;
+    }
     </style>
 </head>
 <body>
@@ -235,9 +261,14 @@
                 {% endif %}
                 {% for task in column.tasks %}
 
-                <div class="task {% if task.is_recurring %}recurring{% endif %}" data-task-id="{{ task.id }}">
+                <div class="task {% if task.is_recurring %}recurring{% endif %} {% if task.is_completed %}completed{% endif %}" data-task-id="{{ task.id }}">
+                    <button class="delete-task" onclick="confirmDeleteTask({{ task.id }})">🗑️</button>
                     <div class="task-content">
                         <div class="task-header">
+                            <label class="completed-toggle">
+                                <input type="checkbox" onchange="toggleCompleted({{ task.id }})" {% if task.is_completed %}checked{% endif %}>
+                                <span class="completed-icon">✓</span>
+                            </label>
                             <label class="recurring-toggle">
                                 <input type="checkbox" onchange="toggleRecurring({{ task.id }})" {% if task.is_recurring %}checked{% endif %}>
                                 <span class="recurring-icon">🔄</span>
@@ -402,6 +433,49 @@
                 }
             });
         }
+
+        // Neue Funktion zum Umschalten des Completed-Status
+        function toggleCompleted(taskId) {
+            fetch('/toggle_completed_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_id: taskId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
+                    taskElement.classList.toggle('completed');
+                }
+            });
+        }
+
+        // Neue Funktion zum Löschen einer Aufgabe
+        function confirmDeleteTask(taskId) {
+            if (confirm('Aufgabe wirklich löschen?')) {
+                fetch(`/delete_task/${taskId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => {
+                    // Aufgabe aus DOM entfernen
+                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
+                    const taskList = taskElement.parentElement;
+                    taskElement.remove();
+                    
+                    // Wenn die Spalte jetzt leer ist, Platzhalter hinzufügen
+                    if (taskList.querySelectorAll('.task').length === 0) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'task placeholder';
+                        taskList.appendChild(placeholder);
+                    }
+                });
+            }
+        }
+
         // Modal-Funktionen
         function closeModals() {
             document.getElementById('editColumnModal').style.display = 'none';
@@ -448,6 +522,4 @@
             }
         }
     </script>
-
 </body>
-</html>
