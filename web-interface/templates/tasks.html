@@ -55,20 +55,13 @@
         .btn-delete {
             color: #d9534f;
         }
-        .task {
-            background-color: #e6f2ff;
-            border: 1px solid #b3d1ff;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 10px;
-            cursor: move;
-        }
-        .task-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 5px;
-            margin-top: 5px;
-        }
+
+.task-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px; /* Kleinerer Abstand zwischen Aktions-Buttons */
+    margin-top: 3px; /* Reduzierter Abstand nach oben */
+}
         .new-task-form, .new-column-form, .edit-column-form {
             margin-top: 10px;
             display: flex;
@@ -154,13 +147,14 @@
     }
     
     .task {
-        background-color: white;
-        padding: 10px;
-        margin-bottom: 8px;
-        border-radius: 3px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-        cursor: move;
-    }
+    background-color: white;
+    padding: 6px 8px; /* Reduziertes Padding oben/unten und links/rechts */
+    margin-bottom: 6px; /* Etwas kleinerer Abstand zwischen Tasks */
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Leicht reduzierter Schatten */
+    cursor: move;
+    font-size: 0.95em; /* Optional: Leicht kleinere Schriftgröße */
+}
     
     .recurring {
         border-left: 4px solid #4caf50;
