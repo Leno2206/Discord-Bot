@@ -1,17 +1,115 @@
-<div class="board">
-    {% for column in columns %}
-      <div class="column">
-        <h2>{{ column.name }}</h2>
-        <ul>
-          {% for task in column.tasks %}
-            <li>{{ task.title }}</li>
-          {% endfor %}
-        </ul>
-        <form action="{{ url_for('add_task', column_id=column.id) }}" method="post">
-          <input type="text" name="title" placeholder="Neue Aufgabe">
-          <button type="submit">➕</button>
-        </form>
-      </div>
-    {% endfor %}
-  </div>
-  
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Haushalts-Taskboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f0f0f5;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .board {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 20px;
+        }
+        .column {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 10px;
+            min-width: 250px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .column h2 {
+            text-align: center;
+        }
+        .task {
+            background-color: #e6f2ff;
+            border: 1px solid #b3d1ff;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            cursor: move;
+        }
+        .new-task-form, .new-column-form {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        input, button, select {
+            margin: 5px 0;
+            padding: 6px;
+        }
+        .footer-link {
+            text-align: center;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🧼 Haushalts-Taskboard</h1>
+
+    <div class="board" id="taskBoard">
+        {% for column in columns %}
+        <div class="column">
+            <h2>{{ column.name }}</h2>
+            <div class="task-list" id="column-{{ column.id }}">
+                {% for task in column.tasks %}
+                    <div class="task" data-task-id="{{ task.id }}">
+                        <strong>{{ task.title }}</strong><br>
+                        <small>{{ task.description }}</small>
+                    </div>
+                {% endfor %}
+            </div>
+            <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
+                <input type="text" name="title" placeholder="Aufgabe" required>
+                <input type="text" name="description" placeholder="Beschreibung">
+                <button type="submit">➕ Aufgabe</button>
+            </form>
+        </div>
+        {% endfor %}
+
+        <div class="column">
+            <h2>➕ Neue Spalte</h2>
+            <form class="new-column-form" action="{{ url_for('add_column') }}" method="post">
+                <input type="text" name="name" placeholder="Spaltenname" required>
+                <button type="submit">Hinzufügen</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer-link">
+        <a href="{{ url_for('index') }}">🔙 Zurück zur Startseite</a>
+    </div>
+
+    <script>
+        document.querySelectorAll('.task-list').forEach(list => {
+            new Sortable(list, {
+                group: 'shared',
+                animation: 150,
+                onEnd: function (evt) {
+                    const taskId = evt.item.dataset.taskId;
+                    const newColumnId = evt.to.id.replace('column-', '');
+                    fetch('/move_task', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+                    });
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
