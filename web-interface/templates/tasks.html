@@ -410,26 +410,85 @@
                     });
                 },
                 onEnd: function(evt) {
-                    // Deaktiviere Drop-Indikatoren nach dem Ablegen
-                    document.querySelectorAll('.task-list').forEach(l => {
-                        l.classList.remove('highlight-drop-target');
-                    });
+    // Deaktiviere Drop-Indikatoren nach dem Ablegen
+    document.querySelectorAll('.task-list').forEach(l => {
+        l.classList.remove('highlight-drop-target');
+    });
+
+    // Falls es eine Kopie ist, wurde bereits in onAdd eine Anfrage gesendet
+    if (evt.pullMode === 'clone') {
+        return;
+    }
+
+    const taskId = evt.item.dataset.taskId;
+    const newColumnId = evt.to.id.replace('column-', '');
     
-                    // Falls es eine Kopie ist, wurde bereits in onAdd eine Anfrage gesendet
-                    if (evt.pullMode === 'clone') {
-                        return;
-                    }
+    // Check if the task is moved between different column types (backlog vs. non-backlog)
+    const isSourceBacklog = evt.from.closest('.column').classList.contains('backlog');
+    const isTargetBacklog = evt.to.closest('.column').classList.contains('backlog');
     
-                    const taskId = evt.item.dataset.taskId;
-                    const newColumnId = evt.to.id.replace('column-', '');
-                    fetch('/move_task', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
-                    });
-                }
+    if (isSourceBacklog !== isTargetBacklog) {
+        // The task is moved between different column types, we need to update its structure
+        const taskTitle = evt.item.querySelector('strong').textContent;
+        const taskDescription = evt.item.querySelector('small')?.textContent || '';
+        const isRecurring = evt.item.classList.contains('recurring');
+        const isCompleted = evt.item.classList.contains('completed');
+        
+        // Create the new task element with appropriate structure
+        const newTaskElement = document.createElement('div');
+        newTaskElement.className = `task ${isTargetBacklog && isRecurring ? 'recurring' : ''} ${isCompleted ? 'completed' : ''}`;
+        newTaskElement.dataset.taskId = taskId;
+        
+        // Create the appropriate HTML structure based on the target column type
+        if (isTargetBacklog) {
+            // Structure for tasks in backlog columns
+            newTaskElement.innerHTML = `
+                <button class="delete-task" onclick="confirmDeleteTask(${taskId})">🗑️</button>
+                <div class="task-content">
+                    <div class="task-header">
+                        <label class="completed-toggle">
+                            <input type="checkbox" 
+                                   onchange="toggleCompleted(${taskId}, this)" 
+                                   ${isCompleted ? 'checked' : ''}>
+                        </label>
+                        <strong>${taskTitle}</strong>
+                    </div>
+                    <small>${taskDescription}</small>
+                </div>
+            `;
+        } else {
+            // Structure for tasks in non-backlog columns
+            newTaskElement.innerHTML = `
+                <button class="delete-task" onclick="confirmDeleteTask(${taskId})">🗑️</button>
+                <div class="task-content">
+                    <div class="task-header">
+                        <label class="completed-toggle">
+                            <input type="checkbox" 
+                                  class="completed-checkbox" 
+                                  data-task-id="${taskId}"
+                                  ${isCompleted ? 'checked' : ''}>
+                            <span class="completed-icon"> ✓ </span>
+                        </label>
+                        <strong>${taskTitle}</strong>
+                    </div>
+                    <small>${taskDescription}</small>
+                </div>
+            `;
+        }
+        
+        // Replace the original task with the new one
+        evt.item.replaceWith(newTaskElement);
+    }
+    
+    // Send update to server
+    fetch('/move_task', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+    });
+}
             });
         });
     
