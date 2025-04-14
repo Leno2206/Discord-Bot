@@ -266,7 +266,7 @@
                         <div class="task-header">
                             <label class="completed-toggle">
                                 <input type="checkbox" onchange="toggleCompleted({{ task.id }})" {% if task.is_completed %}checked{% endif %}>
-                                <span class="completed-icon">✓</span>
+                                <span class="completed-icon"> ✓</span>
                             </label>
                             <label class="recurring-toggle">
                                 <input type="checkbox" onchange="toggleRecurring({{ task.id }})" {% if task.is_recurring %}checked{% endif %}>
