@@ -110,6 +110,11 @@
         .close:hover {
             color: black;
         }
+        .task-list.highlight-drop-target {
+    border: 2px dashed #4a6fa5;
+    background-color: #f0f8ff;
+    transition: background-color 0.2s, border 0.2s;
+}
     </style>
 </head>
 <body>
@@ -189,22 +194,58 @@
 
     <script>
         document.querySelectorAll('.task-list').forEach(list => {
-            new Sortable(list, {
-                group: 'shared',
-                animation: 150,
-                onEnd: function (evt) {
-                    const taskId = evt.item.dataset.taskId;
-                    const newColumnId = evt.to.id.replace('column-', '');
-                    fetch('/move_task', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
-                    });
-                }
+    new Sortable(list, {
+        group: 'shared',
+        animation: 150,
+        onEnd: function (evt) {
+            const taskId = evt.item.dataset.taskId;
+            const newColumnId = evt.to.id.replace('column-', '');
+            fetch('/move_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
             });
-        });
+
+            // Entferne Highlight von allen Listen
+            document.querySelectorAll('.task-list').forEach(l => {
+                l.classList.remove('highlight-drop-target');
+            });
+        },
+        onChoose: function () {
+            // Optional: beim Start des Draggens
+        },
+        onUnchoose: function () {
+            // Optional: wenn das Dragging beendet wird
+        },
+        onMove: function (evt, originalEvent) {
+            // Optional: hier könntest du gezielter steuern, wo angezeigt wird
+        },
+        onStart: function () {
+            // Aktiviere Drop-Indikatoren für alle Spalten
+            document.querySelectorAll('.task-list').forEach(l => {
+                l.classList.add('highlight-drop-target');
+            });
+        },
+        onEnd: function (evt) {
+            // Deaktiviere Drop-Indikatoren nach dem Ablegen
+            document.querySelectorAll('.task-list').forEach(l => {
+                l.classList.remove('highlight-drop-target');
+            });
+
+            const taskId = evt.item.dataset.taskId;
+            const newColumnId = evt.to.id.replace('column-', '');
+            fetch('/move_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+            });
+        }
+    });
+});
 
         // Modal-Funktionen
         function closeModals() {
