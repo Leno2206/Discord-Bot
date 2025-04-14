@@ -349,149 +349,133 @@
 
     <script>
         document.querySelectorAll('.task-list').forEach(list => {
-            new Sortable(list, {
-                group: {
-                    name: 'shared',
-                    pull: function(to, from, el) {
-                        // Wenn die Aufgabe als wiederkehrend markiert ist, wird sie kopiert
-                        if (el.classList.contains('recurring')) {
-                            return 'clone'; // Kopieren statt verschieben
-                        }
-                        return true; // Normales Verschieben
-                    }
-                },
-                animation: 150,
-                onAdd: function(evt) {
-                    // Wenn eine Aufgabe in eine Spalte hinzugefügt wird, entferne den Platzhalter
-                    const placeholders = evt.to.querySelectorAll('.placeholder');
-                    placeholders.forEach(placeholder => placeholder.remove());
-                    
-                    // Wenn es sich um eine Kopie handelt
-                    if (evt.pullMode === 'clone') {
-                        // Die ID der kopierten Aufgabe muss aktualisiert werden
-                        const originalTaskId = evt.item.dataset.taskId;
-                        // Server-Anfrage für neue Task-ID
-                        fetch('/copy_task', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ 
-                                task_id: originalTaskId, 
-                                column_id: evt.to.id.replace('column-', '')
-                            })
-                        })
-                        .then(response => response.json())
-                        .then(data => {
-                            // Aktualisiere die ID des kopierten Elements
-                            evt.item.dataset.taskId = data.new_task_id;
-                        });
-                    }
-                },
-                onRemove: function(evt) {
-                    // Wenn die letzte Aufgabe aus einer Spalte entfernt wird, füge den Platzhalter hinzu
-                    const tasksLeft = evt.from.querySelectorAll('.task:not(.placeholder)').length;
-                    
-                    // Falls die Aufgabe kopiert wurde, muss nichts getan werden
-                    if (evt.pullMode === 'clone') {
-                        return;
-                    }
-                    
-                    if (tasksLeft === 0) {
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'task placeholder';
-                        evt.from.appendChild(placeholder);
-                    }
-                },
-                onStart: function() {
-                    // Aktiviere Drop-Indikatoren für alle Spalten
-                    document.querySelectorAll('.task-list').forEach(l => {
-                        l.classList.add('highlight-drop-target');
-                    });
-                },
-                onEnd: function(evt) {
-    // Deaktiviere Drop-Indikatoren nach dem Ablegen
-    document.querySelectorAll('.task-list').forEach(l => {
-        l.classList.remove('highlight-drop-target');
-    });
-
-    // Falls es eine Kopie ist, wurde bereits in onAdd eine Anfrage gesendet
-    if (evt.pullMode === 'clone') {
-        return;
-    }
-
-    const taskId = evt.item.dataset.taskId;
-    const newColumnId = evt.to.id.replace('column-', '');
-    
-    // Check if the task is moved between different column types (backlog vs. non-backlog)
-    const isSourceBacklog = evt.from.closest('.column').classList.contains('backlog');
-    const isTargetBacklog = evt.to.closest('.column').classList.contains('backlog');
-    
-    if (isSourceBacklog !== isTargetBacklog) {
-        // The task is moved between different column types, we need to update its structure
-        const taskTitle = evt.item.querySelector('strong').textContent;
-        const taskDescription = evt.item.querySelector('small')?.textContent || '';
-        const isRecurring = evt.item.classList.contains('recurring');
-        const isCompleted = evt.item.classList.contains('completed');
-        
-        // Create the new task element with appropriate structure
-        const newTaskElement = document.createElement('div');
-        newTaskElement.className = `task ${isTargetBacklog && isRecurring ? 'recurring' : ''} ${isCompleted ? 'completed' : ''}`;
-        newTaskElement.dataset.taskId = taskId;
-        
-        // Create the appropriate HTML structure based on the target column type
-        if (isTargetBacklog) {
-            // Structure for tasks in backlog columns
-            newTaskElement.innerHTML = `
-                <button class="delete-task" onclick="confirmDeleteTask(${taskId})">🗑️</button>
-                <div class="task-content">
-                    <div class="task-header">
-                        <label class="completed-toggle">
-                            <input type="checkbox" 
-                                   onchange="toggleCompleted(${taskId}, this)" 
-                                   ${isCompleted ? 'checked' : ''}>
-                        </label>
-                        <strong>${taskTitle}</strong>
-                    </div>
-                    <small>${taskDescription}</small>
-                </div>
-            `;
-        } else {
-            // Structure for tasks in non-backlog columns
-            newTaskElement.innerHTML = `
-                <button class="delete-task" onclick="confirmDeleteTask(${taskId})">🗑️</button>
-                <div class="task-content">
-                    <div class="task-header">
-                        <label class="completed-toggle">
-                            <input type="checkbox" 
-                                  class="completed-checkbox" 
-                                  data-task-id="${taskId}"
-                                  ${isCompleted ? 'checked' : ''}>
-                            <span class="completed-icon"> ✓ </span>
-                        </label>
-                        <strong>${taskTitle}</strong>
-                    </div>
-                    <small>${taskDescription}</small>
-                </div>
-            `;
-        }
-        
-        // Replace the original task with the new one
-        evt.item.replaceWith(newTaskElement);
-    }
-    
-    // Send update to server
-    fetch('/move_task', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
+    new Sortable(list, {
+        group: {
+            name: 'shared',
+            pull: function(to, from) {
+                // If the column is a backlog, tasks should be copied
+                return from.closest('.column').classList.contains('backlog') ? 'clone' : true;
+            }
         },
-        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
-    });
-}
+        animation: 150,
+        onStart: function() {
+            // Highlight drop targets
+            document.querySelectorAll('.task-list').forEach(l => {
+                l.classList.add('highlight-drop-target');
             });
-        });
-    
+        },
+        onAdd: function(evt) {
+            // Remove placeholder if present
+            const placeholders = evt.to.querySelectorAll('.placeholder');
+            placeholders.forEach(placeholder => placeholder.remove());
+            
+            // Handle task copying or moving
+            const isFromBacklog = evt.from.closest('.column').classList.contains('backlog');
+            const isToBacklog = evt.to.closest('.column').classList.contains('backlog');
+            
+            // If this is a copied task from backlog
+            if (isFromBacklog && !isToBacklog) {
+                const originalTaskId = evt.item.dataset.taskId;
+                
+                // Modify task structure for non-backlog column
+                // Add completed checkbox if target is not backlog
+                const taskElement = evt.item;
+                const taskTitle = taskElement.querySelector('strong').textContent;
+                const taskDescription = taskElement.querySelector('small')?.textContent || '';
+                
+                // Update the task HTML to include checkbox for completion
+                const taskContent = taskElement.querySelector('.task-content');
+                const taskHeader = taskContent.querySelector('.task-header');
+                
+                // Create checkbox if it doesn't exist
+                if (!taskHeader.querySelector('.completed-toggle')) {
+                    const label = document.createElement('label');
+                    label.className = 'completed-toggle';
+                    label.innerHTML = `
+                        <input type="checkbox" class="completed-checkbox" data-task-id="${originalTaskId}">
+                        <span class="completed-icon"> ✓ </span>
+                    `;
+                    
+                    // Insert at beginning of task header
+                    taskHeader.insertBefore(label, taskHeader.firstChild);
+                }
+                
+                // Fetch new task ID from server
+                fetch('/copy_task', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        task_id: originalTaskId, 
+                        column_id: evt.to.id.replace('column-', '')
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Update task ID in DOM and checkbox
+                    taskElement.dataset.taskId = data.new_task_id;
+                    const checkbox = taskElement.querySelector('.completed-checkbox');
+                    if (checkbox) {
+                        checkbox.dataset.taskId = data.new_task_id;
+                    }
+                    // Update delete button
+                    const deleteBtn = taskElement.querySelector('.delete-task');
+                    deleteBtn.setAttribute('onclick', `confirmDeleteTask(${data.new_task_id})`);
+                });
+                
+            } else if (!isFromBacklog && isToBacklog) {
+                // If moving to backlog, remove completion checkbox
+                const taskElement = evt.item;
+                const checkbox = taskElement.querySelector('.completed-toggle');
+                if (checkbox) {
+                    checkbox.remove();
+                }
+                
+                // Update task position in database
+                const taskId = taskElement.dataset.taskId;
+                const newColumnId = evt.to.id.replace('column-', '');
+                
+                fetch('/move_task', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+                });
+            } else {
+                // Regular move between same type columns
+                const taskId = evt.item.dataset.taskId;
+                const newColumnId = evt.to.id.replace('column-', '');
+                
+                fetch('/move_task', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+                });
+            }
+        },
+        onRemove: function(evt) {
+            // If this wasn't a clone/copy operation and the source column is now empty
+            if (evt.pullMode !== 'clone') {
+                const tasksLeft = evt.from.querySelectorAll('.task:not(.placeholder)').length;
+                if (tasksLeft === 0) {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'task placeholder';
+                    evt.from.appendChild(placeholder);
+                }
+            }
+        },
+        onEnd: function(evt) {
+            // Remove highlight on drop targets
+            document.querySelectorAll('.task-list').forEach(l => {
+                l.classList.remove('highlight-drop-target');
+            });
+        }
+    });
+});    
         function toggleRecurring(taskId, isChecked, checkboxElement) {
   fetch('/toggle_recurring_task', {
     method: 'POST',
