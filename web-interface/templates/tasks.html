@@ -141,17 +141,16 @@
                 </div>
             </div>
             <div class="task-list" id="column-{{ column.id }}">
-                {% if column.tasks|length == 0 %}
-                    <div class="task placeholder">Hierhin ziehen</div>
-                {% endif %}
-                {% for task in column.tasks %}
-                    <div class="task" data-task-id="{{ task.id }}">
-                        <strong>{{ task.title }}</strong><br>
-                        <small>{{ task.description }}</small>
-                        ...
-                    </div>
-                {% endfor %}
-            </div>
+    {% if column.tasks|length == 0 %}
+        <div class="task placeholder"></div>
+    {% endif %}
+    {% for task in column.tasks %}
+        <div class="task" data-task-id="{{ task.id }}">
+            <strong>{{ task.title }}</strong><br>
+            <small>{{ task.description }}</small>
+        </div>
+    {% endfor %}
+</div>
             <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
                 <input type="text" name="title" placeholder="Aufgabe" required>
                 <input type="text" name="description" placeholder="Beschreibung">
