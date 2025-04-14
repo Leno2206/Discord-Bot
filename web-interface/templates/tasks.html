@@ -263,7 +263,9 @@
                 {% endif %}
                 {% for task in column.tasks %}
 
-                <div class="task {% if task.is_recurring %}recurring{% endif %} {% if task.is_completed %}completed{% endif %}" data-task-id="{{ task.id }}">
+                <div class="task 
+                {% if column.is_backlog and task.is_recurring %}recurring{% endif %} 
+                {% if task.is_completed %}completed{% endif %}" data-task-id="{{ task.id }}">
                     <button class="delete-task" onclick="confirmDeleteTask({{ task.id }})">🗑️</button>
                     <div class="task-content">
                         <div class="task-header">
