@@ -763,7 +763,7 @@ def toggle_recurring_task():
     conn.commit()
     conn.close()
 
-    return jsonify({'success': True, 'is_recurring': new_state})
+    return jsonify({'success': True, 'is_completed': new_state})
 
 @app.route("/delete_reminder/<int:reminder_id>")
 def delete_reminder(reminder_id):

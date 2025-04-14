@@ -170,6 +170,7 @@
     box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     cursor: move;
     position: relative;
+    transition: all 0.3s ease;
 }
 .recurring-toggle, .completed-toggle {
     display: flex;
@@ -271,15 +272,20 @@
                         <div class="task-header">
                             {% if not column.is_backlog %}
                             <label class="completed-toggle">
-                                <input type="checkbox" onchange="toggleCompleted({{ task.id }})" {% if task.is_completed %}checked{% endif %}>
+<!-- Nachher -->
+<input type="checkbox" 
+       class="completed-checkbox" 
+       data-task-id="{{ task.id }}"
+       {% if task.is_completed %}checked{% endif %}>
                                 <span class="completed-icon"> ✓ </span>
                             </label>
                             {% endif %}
                         
                             {% if column.is_backlog %}
-                            <label class="recurring-toggle">
-                                <input type="checkbox" onchange="toggleRecurring({{ task.id }})" {% if task.is_recurring %}checked{% endif %}>
-                                <span class="recurring-icon">🔄</span>
+                            <label class="completed-toggle">
+                                <input type="checkbox" 
+                                       onchange="toggleCompleted({{ task.id }}, this)" 
+                                       {% if task.is_completed %}checked{% endif %}>
                             </label>
                             {% endif %}
                         
@@ -427,40 +433,41 @@
             });
         });
     
-        function toggleRecurring(taskId) {
-            fetch('/toggle_recurring_task', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ task_id: taskId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
-                    taskElement.classList.toggle('recurring');
-                }
-            });
-        }
+        function toggleRecurring(taskId, isChecked, checkboxElement) {
+  fetch('/toggle_recurring_task', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ task_id: taskId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (!data.success) {
+      // Rollback bei Fehler
+      checkboxElement.checked = !isChecked;
+    }
+    // Aktualisiere CSS-Klasse
+    const taskElement = checkboxElement.closest('.task');
+    taskElement.classList.toggle('recurring', data.is_recurring);
+  });
 
         // Neue Funktion zum Umschalten des Completed-Status
-        function toggleCompleted(taskId) {
-            fetch('/toggle_completed_task', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ task_id: taskId })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
-                    taskElement.classList.toggle('completed');
-                }
-            });
-        }
+        function toggleCompleted(taskId, isChecked, checkboxElement) {
+  fetch('/toggle_completed_task', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ task_id: taskId })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (!data.success) {
+      // Rollback bei Fehler
+      checkboxElement.checked = !isChecked;
+    }
+    // Aktualisiere CSS-Klasse
+    const taskElement = checkboxElement.closest('.task');
+    taskElement.classList.toggle('completed', data.is_completed);
+  });
+}
 
         // Neue Funktion zum Löschen einer Aufgabe
         function confirmDeleteTask(taskId) {
@@ -531,5 +538,21 @@
                 editTaskModal.style.display = 'none';
             }
         }
+
+        document.addEventListener('change', (event) => {
+  // Handle Recurring-Checkboxen
+  if (event.target.classList.contains('recurring-checkbox')) {
+    const taskId = event.target.dataset.taskId;
+    const isChecked = event.target.checked;
+    toggleRecurring(taskId, isChecked, event.target);
+  }
+
+  // Handle Completed-Checkboxen
+  if (event.target.classList.contains('completed-checkbox')) {
+    const taskId = event.target.dataset.taskId;
+    const isChecked = event.target.checked;
+    toggleCompleted(taskId, isChecked, event.target);
+  }
+});
     </script>
 </body>
