@@ -30,6 +30,30 @@
         }
         .column h2 {
             text-align: center;
+            margin-bottom: 10px;
+        }
+        .column-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .column-actions {
+            display: flex;
+            gap: 5px;
+        }
+        .btn-edit, .btn-delete {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 5px;
+        }
+        .btn-edit {
+            color: #4a6fa5;
+        }
+        .btn-delete {
+            color: #d9534f;
         }
         .task {
             background-color: #e6f2ff;
@@ -39,7 +63,13 @@
             margin-bottom: 10px;
             cursor: move;
         }
-        .new-task-form, .new-column-form {
+        .task-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .new-task-form, .new-column-form, .edit-column-form {
             margin-top: 10px;
             display: flex;
             flex-direction: column;
@@ -52,6 +82,34 @@
             text-align: center;
             margin-top: 30px;
         }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 50%;
+            max-width: 500px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
     </style>
 </head>
 <body>
@@ -61,12 +119,25 @@
     <div class="board" id="taskBoard">
         {% for column in columns %}
         <div class="column">
-            <h2>{{ column.name }}</h2>
+            <div class="column-header">
+                <h2>{{ column.name }}</h2>
+                <div class="column-actions">
+                    <button class="btn-edit" onclick="openEditColumnModal({{ column.id }}, '{{ column.name }}')">✏️</button>
+                    <button class="btn-delete" onclick="confirmDeleteColumn({{ column.id }})">🗑️</button>
+                </div>
+            </div>
             <div class="task-list" id="column-{{ column.id }}">
                 {% for task in column.tasks %}
                     <div class="task" data-task-id="{{ task.id }}">
                         <strong>{{ task.title }}</strong><br>
                         <small>{{ task.description }}</small>
+                        <div class="task-actions">
+                            <button class="btn-edit" onclick="openEditTaskModal({{ task.id }}, '{{ task.title }}', '{{ task.description }}')">✏️</button>
+                            <form style="display: inline;" action="{{ url_for('delete_task', task_id=task.id) }}" method="post"
+                                  onsubmit="return confirm('Aufgabe wirklich löschen?')">
+                                <button type="submit" class="btn-delete">🗑️</button>
+                            </form>
+                        </div>
                     </div>
                 {% endfor %}
             </div>
@@ -91,6 +162,31 @@
         <a href="{{ url_for('index') }}">🔙 Zurück zur Startseite</a>
     </div>
 
+    <!-- Modal zum Bearbeiten von Spalten -->
+    <div id="editColumnModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModals()">&times;</span>
+            <h3>Spalte bearbeiten</h3>
+            <form id="editColumnForm" class="edit-column-form" method="post">
+                <input type="text" id="editColumnName" name="name" required>
+                <button type="submit">Speichern</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal zum Bearbeiten von Aufgaben -->
+    <div id="editTaskModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModals()">&times;</span>
+            <h3>Aufgabe bearbeiten</h3>
+            <form id="editTaskForm" class="edit-column-form" method="post">
+                <input type="text" id="editTaskTitle" name="title" placeholder="Aufgabe" required>
+                <input type="text" id="editTaskDescription" name="description" placeholder="Beschreibung">
+                <button type="submit">Speichern</button>
+            </form>
+        </div>
+    </div>
+
     <script>
         document.querySelectorAll('.task-list').forEach(list => {
             new Sortable(list, {
@@ -109,6 +205,52 @@
                 }
             });
         });
+
+        // Modal-Funktionen
+        function closeModals() {
+            document.getElementById('editColumnModal').style.display = 'none';
+            document.getElementById('editTaskModal').style.display = 'none';
+        }
+
+        function openEditColumnModal(columnId, columnName) {
+            document.getElementById('editColumnName').value = columnName;
+            document.getElementById('editColumnForm').action = `/edit_column/${columnId}`;
+            document.getElementById('editColumnModal').style.display = 'block';
+        }
+
+        function openEditTaskModal(taskId, taskTitle, taskDescription) {
+            document.getElementById('editTaskTitle').value = taskTitle;
+            document.getElementById('editTaskDescription').value = taskDescription || '';
+            document.getElementById('editTaskForm').action = `/edit_task/${taskId}`;
+            document.getElementById('editTaskModal').style.display = 'block';
+        }
+
+        function confirmDeleteColumn(columnId) {
+            if (confirm('Spalte wirklich löschen? Alle Aufgaben in dieser Spalte werden ebenfalls gelöscht!')) {
+                fetch(`/delete_column/${columnId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(() => {
+                    window.location.reload();
+                });
+            }
+        }
+
+        // Schließen der Modals, wenn außerhalb geklickt wird
+        window.onclick = function(event) {
+            const editColumnModal = document.getElementById('editColumnModal');
+            const editTaskModal = document.getElementById('editTaskModal');
+            
+            if (event.target === editColumnModal) {
+                editColumnModal.style.display = 'none';
+            }
+            
+            if (event.target === editTaskModal) {
+                editTaskModal.style.display = 'none';
+            }
+        }
     </script>
 
 </body>
