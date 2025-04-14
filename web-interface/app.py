@@ -126,25 +126,25 @@ def tasks():
     columns = []
     for col_id, name, position, is_backlog in cursor.fetchall():
         # Aufgaben für jede Spalte abrufen
-        cursor.execute("""
-            SELECT id, title, description, is_recurring, position
-            FROM taskboard_tasks
-            WHERE column_id = %s
-            ORDER BY position
-        """, (col_id,))
+         cursor.execute("""
+        SELECT id, title, description, is_recurring, is_completed, position
+        FROM taskboard_tasks
+        WHERE column_id = %s
+        ORDER BY position
+    """, (col_id,))
+    
+    tasks = [
+        {
+            'id': task_id,
+            'title': title,
+            'description': desc,
+            'is_recurring': is_recurring,
+            'is_completed': is_completed
+        }
+        for task_id, title, desc, is_recurring, is_completed, _ in cursor.fetchall()
+    ]
         
-        tasks = [
-    {
-        'id': task_id,
-        'title': title,
-        'description': desc,
-        'is_recurring': is_recurring
-    }
-    for task_id, title, desc, is_recurring, _ in cursor.fetchall()
-
-]
-        
-        columns.append({
+    columns.append({
     'id': col_id,
     'name': name,
     'tasks': tasks,
@@ -806,7 +806,39 @@ def get_bot_status():
     result = subprocess.run(["docker", "inspect", "--format='{{.State.Running}}'", "discord-bot"], capture_output=True, text=True)
     is_running = "true" in result.stdout
     return {"status": "online" if is_running else "offline"}
+@app.route('/toggle_completed_task', methods=['POST'])
+def toggle_completed_task():
+    if 'discord_id' not in session:
+        return jsonify({'success': False, 'message': 'Nicht angemeldet'}), 401
 
+    data = request.get_json()
+    task_id = data.get("task_id")
+
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Datenbankfehler'}), 500
+
+    cursor = conn.cursor()
+    # Prüfen, ob Task dem User gehört
+    cursor.execute("""
+        SELECT t.is_completed
+        FROM taskboard_tasks t
+        JOIN taskboard_columns c ON t.column_id = c.id
+        WHERE t.id = %s AND c.discord_id = %s
+    """, (task_id, session['discord_id']))
+    result = cursor.fetchone()
+    if not result:
+        conn.close()
+        return jsonify({'success': False, 'message': 'Keine Berechtigung'}), 403
+
+    current_state = result[0]
+    new_state = not current_state
+
+    cursor.execute("UPDATE taskboard_tasks SET is_completed = %s WHERE id = %s", (new_state, task_id))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'success': True, 'is_completed': new_state})
 if __name__ == "__main__":
     conn = get_db_connection()
     if conn:
@@ -840,7 +872,10 @@ if __name__ == "__main__":
             position INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
-        
+        cursor.execute("""
+    ALTER TABLE taskboard_tasks 
+    ADD COLUMN IF NOT EXISTS is_completed BOOLEAN DEFAULT FALSE
+""")
         conn.commit()
         conn.close()
     
