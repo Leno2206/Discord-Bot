@@ -267,14 +267,20 @@
                     <button class="delete-task" onclick="confirmDeleteTask({{ task.id }})">🗑️</button>
                     <div class="task-content">
                         <div class="task-header">
+                            {% if not column.is_backlog %}
                             <label class="completed-toggle">
                                 <input type="checkbox" onchange="toggleCompleted({{ task.id }})" {% if task.is_completed %}checked{% endif %}>
-                                <span class="completed-icon"> ✓ </span>
+                                <span class="completed-icon">✓</span>
                             </label>
+                            {% endif %}
+                        
+                            {% if column.is_backlog %}
                             <label class="recurring-toggle">
                                 <input type="checkbox" onchange="toggleRecurring({{ task.id }})" {% if task.is_recurring %}checked{% endif %}>
                                 <span class="recurring-icon">🔄</span>
                             </label>
+                            {% endif %}
+                        
                             <strong>{{ task.title }}</strong>
                         </div>
                         <small>{{ task.description }}</small>
