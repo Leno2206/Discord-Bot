@@ -470,28 +470,28 @@
 }
 
         // Neue Funktion zum Löschen einer Aufgabe
-        function confirmDeleteTask(taskId) {
-            if (confirm('Aufgabe wirklich löschen?')) {
-                fetch(`/delete_task/${taskId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }).then(() => {
-                    // Aufgabe aus DOM entfernen
-                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
-                    const taskList = taskElement.parentElement;
-                    taskElement.remove();
-                    
-                    // Wenn die Spalte jetzt leer ist, Platzhalter hinzufügen
-                    if (taskList.querySelectorAll('.task').length === 0) {
-                        const placeholder = document.createElement('div');
-                        placeholder.className = 'task placeholder';
-                        taskList.appendChild(placeholder);
-                    }
-                });
+function confirmDeleteTask(taskId) {
+    if (confirm('Aufgabe wirklich löschen?')) {
+        fetch(`/delete_task/${taskId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
             }
-        }
+        }).then(() => {
+            // Aufgabe aus DOM entfernen
+            const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
+            const taskList = taskElement.parentElement;
+            taskElement.remove();
+            
+            // Wenn die Spalte jetzt leer ist, Platzhalter hinzufügen
+            if (taskList.querySelectorAll('.task').length === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'task placeholder';
+                taskList.appendChild(placeholder);
+            }
+        });
+    }
+}
 
         // Modal-Funktionen
         function closeModals() {
