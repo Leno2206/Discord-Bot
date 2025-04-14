@@ -143,7 +143,7 @@ def tasks():
     for task_id, title, desc, is_recurring in cursor.fetchall()
 ]
         
-    columns.append({
+        columns.append({
     'id': col_id,
     'name': name,
     'tasks': tasks,
