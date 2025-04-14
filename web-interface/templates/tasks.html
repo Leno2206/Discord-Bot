@@ -126,47 +126,47 @@
 }
     </style>
 </head>
-<body>
+    <body>
 
-    <h1>🧼 Haushalts-Taskboard</h1>
+        <h1>🧼 Haushalts-Taskboard</h1>
 
-    <div class="board" id="taskBoard">
-        {% for column in columns %}
-        <div class="column">
-            <div class="column-header">
-                <h2>{{ column.name }}</h2>
-                <div class="column-actions">
-                    <button class="btn-edit" onclick="openEditColumnModal({{ column.id }}, '{{ column.name }}')">✏️</button>
-                    <button class="btn-delete" onclick="confirmDeleteColumn({{ column.id }})">🗑️</button>
+        <div class="board" id="taskBoard">
+            {% for column in columns %}
+            <div class="column">
+                <div class="column-header">
+                    <h2>{{ column.name }}</h2>
+                    <div class="column-actions">
+                        <button class="btn-edit" onclick="openEditColumnModal({{ column.id }}, '{{ column.name }}')">✏️</button>
+                        <button class="btn-delete" onclick="confirmDeleteColumn({{ column.id }})">🗑️</button>
+                    </div>
                 </div>
+                <div class="task-list" id="column-{{ column.id }}">
+        {% if column.tasks|length == 0 %}
+            <div class="task placeholder"></div>
+        {% endif %}
+        {% for task in column.tasks %}
+            <div class="task" data-task-id="{{ task.id }}">
+                <strong>{{ task.title }}</strong><br>
+                <small>{{ task.description }}</small>
             </div>
-            <div class="task-list" id="column-{{ column.id }}">
-    {% if column.tasks|length == 0 %}
-        <div class="task placeholder"></div>
-    {% endif %}
-    {% for task in column.tasks %}
-        <div class="task" data-task-id="{{ task.id }}">
-            <strong>{{ task.title }}</strong><br>
-            <small>{{ task.description }}</small>
-        </div>
-    {% endfor %}
-</div>
-            <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
-                <input type="text" name="title" placeholder="Aufgabe" required>
-                <input type="text" name="description" placeholder="Beschreibung">
-                <button type="submit">➕ Aufgabe</button>
-            </form>
-        </div>
         {% endfor %}
-
-        <div class="column">
-            <h2>➕ Neue Spalte</h2>
-            <form class="new-column-form" action="{{ url_for('add_column') }}" method="post">
-                <input type="text" name="name" placeholder="Spaltenname" required>
-                <button type="submit">Hinzufügen</button>
-            </form>
-        </div>
     </div>
+                <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
+                    <input type="text" name="title" placeholder="Aufgabe" required>
+                    <input type="text" name="description" placeholder="Beschreibung">
+                    <button type="submit">➕ Aufgabe</button>
+                </form>
+            </div>
+            {% endfor %}
+
+            <div class="column">
+                <h2>➕ Neue Spalte</h2>
+                <form class="new-column-form" action="{{ url_for('add_column') }}" method="post">
+                    <input type="text" name="name" placeholder="Spaltenname" required>
+                    <button type="submit">Hinzufügen</button>
+                </form>
+            </div>
+        </div>
 
     <div class="footer-link">
         <a href="{{ url_for('index') }}">🔙 Zurück zur Startseite</a>
@@ -198,42 +198,34 @@
     </div>
 
     <script>
-        document.querySelectorAll('.task-list').forEach(list => {
+
+document.querySelectorAll('.task-list').forEach(list => {
     new Sortable(list, {
         group: 'shared',
         animation: 150,
-        onEnd: function (evt) {
-            const taskId = evt.item.dataset.taskId;
-            const newColumnId = evt.to.id.replace('column-', '');
-            fetch('/move_task', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
-            });
-
-            // Entferne Highlight von allen Listen
-            document.querySelectorAll('.task-list').forEach(l => {
-                l.classList.remove('highlight-drop-target');
-            });
+        onAdd: function(evt) {
+            // Wenn eine Aufgabe in eine Spalte hinzugefügt wird, entferne den Platzhalter
+            const placeholders = evt.to.querySelectorAll('.placeholder');
+            placeholders.forEach(placeholder => placeholder.remove());
         },
-        onChoose: function () {
-            // Optional: beim Start des Draggens
+        onRemove: function(evt) {
+            // Wenn die letzte Aufgabe aus einer Spalte entfernt wird, füge den Platzhalter hinzu
+            const fromColumnId = evt.from.id;
+            const tasksLeft = evt.from.querySelectorAll('.task:not(.placeholder)').length;
+            
+            if (tasksLeft === 0) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'task placeholder';
+                evt.from.appendChild(placeholder);
+            }
         },
-        onUnchoose: function () {
-            // Optional: wenn das Dragging beendet wird
-        },
-        onMove: function (evt, originalEvent) {
-            // Optional: hier könntest du gezielter steuern, wo angezeigt wird
-        },
-        onStart: function () {
+        onStart: function() {
             // Aktiviere Drop-Indikatoren für alle Spalten
             document.querySelectorAll('.task-list').forEach(l => {
                 l.classList.add('highlight-drop-target');
             });
         },
-        onEnd: function (evt) {
+        onEnd: function(evt) {
             // Deaktiviere Drop-Indikatoren nach dem Ablegen
             document.querySelectorAll('.task-list').forEach(l => {
                 l.classList.remove('highlight-drop-target');
