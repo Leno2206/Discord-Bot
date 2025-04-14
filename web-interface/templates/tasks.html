@@ -124,49 +124,141 @@
     font-style: italic;
     cursor: default;
 }
+.board {
+        display: flex;
+        gap: 20px;
+        overflow-x: auto;
+        padding: 20px;
+    }
+    
+    .column {
+        min-width: 250px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+        padding: 10px;
+    }
+    
+    .backlog {
+        background-color: #e0f7fa;
+    }
+    
+    .column-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .task-list {
+        min-height: 50px;
+        margin: 10px 0;
+    }
+    
+    .task {
+        background-color: white;
+        padding: 10px;
+        margin-bottom: 8px;
+        border-radius: 3px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+        cursor: move;
+    }
+    
+    .recurring {
+        border-left: 4px solid #4caf50;
+    }
+    
+    .placeholder {
+        background-color: #e9e9e9;
+        border: 2px dashed #ccc;
+        min-height: 30px;
+    }
+    
+    .task-controls {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 5px;
+    }
+    
+    .recurring-toggle {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+    }
+    
+    .recurring-toggle input {
+        margin-right: 3px;
+    }
+    
+    .highlight-drop-target {
+        background-color: #e8f5e9;
+        border: 2px dashed #81c784;
+    }
+    
+    .new-task-form, .new-column-form {
+        margin-top: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    button {
+        padding: 5px 10px;
+        cursor: pointer;
+    }
     </style>
 </head>
-    <body>
+<body>
+    <h1>🧼 Haushalts-Taskboard</h1>
 
-        <h1>🧼 Haushalts-Taskboard</h1>
-
-        <div class="board" id="taskBoard">
-            {% for column in columns %}
-            <div class="column">
-                <div class="column-header">
-                    <h2>{{ column.name }}</h2>
-                    <div class="column-actions">
-                        <button class="btn-edit" onclick="openEditColumnModal({{ column.id }}, '{{ column.name }}')">✏️</button>
-                        <button class="btn-delete" onclick="confirmDeleteColumn({{ column.id }})">🗑️</button>
-                    </div>
+    <div class="board" id="taskBoard">
+        {% for column in columns %}
+        <div class="column {% if column.is_backlog %}backlog{% endif %}">
+            <div class="column-header">
+                <h2>{{ column.name }}</h2>
+                <div class="column-actions">
+                    <button class="btn-edit" onclick="openEditColumnModal({{ column.id }}, '{{ column.name }}')">✏️</button>
+                    <button class="btn-delete" onclick="confirmDeleteColumn({{ column.id }})">🗑️</button>
                 </div>
-                <div class="task-list" id="column-{{ column.id }}">
-        {% if column.tasks|length == 0 %}
-            <div class="task placeholder"></div>
-        {% endif %}
-        {% for task in column.tasks %}
-            <div class="task" data-task-id="{{ task.id }}">
-                <strong>{{ task.title }}</strong><br>
-                <small>{{ task.description }}</small>
             </div>
-        {% endfor %}
-    </div>
-                <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
-                    <input type="text" name="title" placeholder="Aufgabe" required>
-                    <input type="text" name="description" placeholder="Beschreibung">
-                    <button type="submit">➕ Aufgabe</button>
-                </form>
+            <div class="task-list" id="column-{{ column.id }}">
+                {% if column.tasks|length == 0 %}
+                    <div class="task placeholder"></div>
+                {% endif %}
+                {% for task in column.tasks %}
+                    <div class="task {% if task.is_recurring %}recurring{% endif %}" data-task-id="{{ task.id }}">
+                        <div class="task-controls">
+                            <label class="recurring-toggle">
+                                <input type="checkbox" onchange="toggleRecurring({{ task.id }})" {% if task.is_recurring %}checked{% endif %}>
+                                🔄
+                            </label>
+                        </div>
+                        <div class="task-content">
+                            <strong>{{ task.title }}</strong><br>
+                            <small>{{ task.description }}</small>
+                        </div>
+                    </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-
-            <div class="column">
-                <h2>➕ Neue Spalte</h2>
-                <form class="new-column-form" action="{{ url_for('add_column') }}" method="post">
-                    <input type="text" name="name" placeholder="Spaltenname" required>
-                    <button type="submit">Hinzufügen</button>
-                </form>
-            </div>
+            {% if column.is_backlog %}
+            <form class="new-task-form" action="{{ url_for('add_task', column_id=column.id) }}" method="post">
+                <input type="text" name="title" placeholder="Neue Aufgabe" required>
+                <input type="text" name="description" placeholder="Beschreibung">
+                <button type="submit">➕ Aufgabe</button>
+            </form>
+            {% endif %}
         </div>
+        {% endfor %}
+
+        <div class="column">
+            <h2>➕ Neue Spalte</h2>
+            <form class="new-column-form" action="{{ url_for('add_column') }}" method="post">
+                <input type="text" name="name" placeholder="Spaltenname" required>
+                <label>
+                    <input type="checkbox" name="is_backlog"> Als Backlog festlegen
+                </label>
+                <button type="submit">Hinzufügen</button>
+            </form>
+        </div>
+    </div>
 
     <div class="footer-link">
         <a href="{{ url_for('index') }}">🔙 Zurück zur Startseite</a>
@@ -198,52 +290,107 @@
     </div>
 
     <script>
-
-document.querySelectorAll('.task-list').forEach(list => {
-    new Sortable(list, {
-        group: 'shared',
-        animation: 150,
-        onAdd: function(evt) {
-            // Wenn eine Aufgabe in eine Spalte hinzugefügt wird, entferne den Platzhalter
-            const placeholders = evt.to.querySelectorAll('.placeholder');
-            placeholders.forEach(placeholder => placeholder.remove());
-        },
-        onRemove: function(evt) {
-            // Wenn die letzte Aufgabe aus einer Spalte entfernt wird, füge den Platzhalter hinzu
-            const fromColumnId = evt.from.id;
-            const tasksLeft = evt.from.querySelectorAll('.task:not(.placeholder)').length;
-            
-            if (tasksLeft === 0) {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'task placeholder';
-                evt.from.appendChild(placeholder);
-            }
-        },
-        onStart: function() {
-            // Aktiviere Drop-Indikatoren für alle Spalten
-            document.querySelectorAll('.task-list').forEach(l => {
-                l.classList.add('highlight-drop-target');
+        document.querySelectorAll('.task-list').forEach(list => {
+            new Sortable(list, {
+                group: {
+                    name: 'shared',
+                    pull: function(to, from, el) {
+                        // Wenn die Aufgabe als wiederkehrend markiert ist, wird sie kopiert
+                        if (el.classList.contains('recurring')) {
+                            return 'clone'; // Kopieren statt verschieben
+                        }
+                        return true; // Normales Verschieben
+                    }
+                },
+                animation: 150,
+                onAdd: function(evt) {
+                    // Wenn eine Aufgabe in eine Spalte hinzugefügt wird, entferne den Platzhalter
+                    const placeholders = evt.to.querySelectorAll('.placeholder');
+                    placeholders.forEach(placeholder => placeholder.remove());
+                    
+                    // Wenn es sich um eine Kopie handelt
+                    if (evt.pullMode === 'clone') {
+                        // Die ID der kopierten Aufgabe muss aktualisiert werden
+                        const originalTaskId = evt.item.dataset.taskId;
+                        // Server-Anfrage für neue Task-ID
+                        fetch('/copy_task', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ 
+                                task_id: originalTaskId, 
+                                column_id: evt.to.id.replace('column-', '')
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            // Aktualisiere die ID des kopierten Elements
+                            evt.item.dataset.taskId = data.new_task_id;
+                        });
+                    }
+                },
+                onRemove: function(evt) {
+                    // Wenn die letzte Aufgabe aus einer Spalte entfernt wird, füge den Platzhalter hinzu
+                    const tasksLeft = evt.from.querySelectorAll('.task:not(.placeholder)').length;
+                    
+                    // Falls die Aufgabe kopiert wurde, muss nichts getan werden
+                    if (evt.pullMode === 'clone') {
+                        return;
+                    }
+                    
+                    if (tasksLeft === 0) {
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'task placeholder';
+                        evt.from.appendChild(placeholder);
+                    }
+                },
+                onStart: function() {
+                    // Aktiviere Drop-Indikatoren für alle Spalten
+                    document.querySelectorAll('.task-list').forEach(l => {
+                        l.classList.add('highlight-drop-target');
+                    });
+                },
+                onEnd: function(evt) {
+                    // Deaktiviere Drop-Indikatoren nach dem Ablegen
+                    document.querySelectorAll('.task-list').forEach(l => {
+                        l.classList.remove('highlight-drop-target');
+                    });
+    
+                    // Falls es eine Kopie ist, wurde bereits in onAdd eine Anfrage gesendet
+                    if (evt.pullMode === 'clone') {
+                        return;
+                    }
+    
+                    const taskId = evt.item.dataset.taskId;
+                    const newColumnId = evt.to.id.replace('column-', '');
+                    fetch('/move_task', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+                    });
+                }
             });
-        },
-        onEnd: function(evt) {
-            // Deaktiviere Drop-Indikatoren nach dem Ablegen
-            document.querySelectorAll('.task-list').forEach(l => {
-                l.classList.remove('highlight-drop-target');
-            });
-
-            const taskId = evt.item.dataset.taskId;
-            const newColumnId = evt.to.id.replace('column-', '');
-            fetch('/move_task', {
+        });
+    
+        function toggleRecurring(taskId) {
+            fetch('/toggle_recurring_task', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ task_id: taskId, column_id: newColumnId })
+                body: JSON.stringify({ task_id: taskId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const taskElement = document.querySelector(`.task[data-task-id="${taskId}"]`);
+                    taskElement.classList.toggle('recurring');
+                }
             });
         }
-    });
-});
-
         // Modal-Funktionen
         function closeModals() {
             document.getElementById('editColumnModal').style.display = 'none';
