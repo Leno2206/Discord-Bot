@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from authlib.integrations.flask_client import OAuth
 from authlib.integrations.base_client.errors import MismatchingStateError
 from requests_oauthlib import OAuth2Session
@@ -8,7 +8,6 @@ from datetime import datetime
 import logging
 
 import requests
-import jsonify
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Ein Geheimschlüssel für Flask-Session
 app.config['DISCORD_CLIENT_ID'] = '1351152498966265896'  # Deine Discord Client ID
@@ -101,9 +100,357 @@ def logout():
     """Logout the user by clearing the session."""
     session.clear()  # Clear the entire session
     return redirect(url_for('index'))
+
+# Taskboard Routen
 @app.route('/tasks')
 def tasks():
-    return render_template('tasks.html')
+    """Zeigt das Taskboard mit allen Spalten und Aufgaben an."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("index"))
+    
+    cursor = conn.cursor()
+    
+    # Spalten abrufen
+    cursor.execute("""
+        SELECT id, name, position 
+        FROM taskboard_columns 
+        WHERE discord_id = %s 
+        ORDER BY position
+    """, (session['discord_id'],))
+    
+    columns = []
+    for col_id, name, position in cursor.fetchall():
+        # Aufgaben für jede Spalte abrufen
+        cursor.execute("""
+            SELECT id, title, description, position
+            FROM taskboard_tasks
+            WHERE column_id = %s
+            ORDER BY position
+        """, (col_id,))
+        
+        tasks = [
+            {
+                'id': task_id,
+                'title': title,
+                'description': desc
+            }
+            for task_id, title, desc, pos in cursor.fetchall()
+        ]
+        
+        columns.append({
+            'id': col_id,
+            'name': name,
+            'tasks': tasks
+        })
+    
+    conn.close()
+    return render_template('tasks.html', columns=columns)
+
+@app.route('/add_column', methods=['POST'])
+def add_column():
+    """Neue Spalte hinzufügen."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    column_name = request.form.get('name')
+    if not column_name:
+        flash("Spaltenname darf nicht leer sein", "error")
+        return redirect(url_for('tasks'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    
+    # Höchste Position finden
+    cursor.execute("""
+        SELECT COALESCE(MAX(position), -1) 
+        FROM taskboard_columns 
+        WHERE discord_id = %s
+    """, (session['discord_id'],))
+    
+    max_position = cursor.fetchone()[0]
+    
+    # Neue Spalte einfügen
+    cursor.execute("""
+        INSERT INTO taskboard_columns (discord_id, name, position)
+        VALUES (%s, %s, %s)
+    """, (session['discord_id'], column_name, max_position + 1))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/edit_column/<int:column_id>', methods=['POST'])
+def edit_column(column_id):
+    """Spalte bearbeiten."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    column_name = request.form.get('name')
+    if not column_name:
+        flash("Spaltenname darf nicht leer sein", "error")
+        return redirect(url_for('tasks'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE taskboard_columns 
+        SET name = %s 
+        WHERE id = %s AND discord_id = %s
+    """, (column_name, column_id, session['discord_id']))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/delete_column/<int:column_id>', methods=['POST'])
+def delete_column(column_id):
+    """Spalte löschen."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    # Zuerst alle zugehörigen Tasks löschen
+    cursor.execute("""
+        DELETE FROM taskboard_tasks 
+        WHERE column_id = %s
+    """, (column_id,))
+    
+    # Dann die Spalte löschen
+    cursor.execute("""
+        DELETE FROM taskboard_columns 
+        WHERE id = %s AND discord_id = %s
+    """, (column_id, session['discord_id']))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/add_task/<int:column_id>', methods=['POST'])
+def add_task(column_id):
+    """Aufgabe zu Spalte hinzufügen."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    
+    if not title:
+        flash("Aufgabentitel darf nicht leer sein", "error")
+        return redirect(url_for('tasks'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    
+    # Prüfen, ob die Spalte dem Benutzer gehört
+    cursor.execute("""
+        SELECT id FROM taskboard_columns 
+        WHERE id = %s AND discord_id = %s
+    """, (column_id, session['discord_id']))
+    
+    if not cursor.fetchone():
+        conn.close()
+        flash("Keine Berechtigung für diese Aktion", "error")
+        return redirect(url_for('tasks'))
+    
+    # Höchste Position in der Spalte finden
+    cursor.execute("""
+        SELECT COALESCE(MAX(position), -1) 
+        FROM taskboard_tasks 
+        WHERE column_id = %s
+    """, (column_id,))
+    
+    max_position = cursor.fetchone()[0]
+    
+    # Neue Aufgabe einfügen
+    cursor.execute("""
+        INSERT INTO taskboard_tasks (column_id, title, description, position)
+        VALUES (%s, %s, %s, %s)
+    """, (column_id, title, description, max_position + 1))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/edit_task/<int:task_id>', methods=['POST'])
+def edit_task(task_id):
+    """Aufgabe bearbeiten."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    title = request.form.get('title')
+    description = request.form.get('description', '')
+    
+    if not title:
+        flash("Aufgabentitel darf nicht leer sein", "error")
+        return redirect(url_for('tasks'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    
+    # Prüfen, ob die Aufgabe dem Benutzer gehört
+    cursor.execute("""
+        SELECT t.id
+        FROM taskboard_tasks t
+        JOIN taskboard_columns c ON t.column_id = c.id
+        WHERE t.id = %s AND c.discord_id = %s
+    """, (task_id, session['discord_id']))
+    
+    if not cursor.fetchone():
+        conn.close()
+        flash("Keine Berechtigung für diese Aktion", "error")
+        return redirect(url_for('tasks'))
+    
+    # Aufgabe aktualisieren
+    cursor.execute("""
+        UPDATE taskboard_tasks
+        SET title = %s, description = %s
+        WHERE id = %s
+    """, (title, description, task_id))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/delete_task/<int:task_id>', methods=['POST'])
+def delete_task(task_id):
+    """Aufgabe löschen."""
+    if 'discord_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    if not conn:
+        flash("Fehler bei der Datenbankverbindung.", "error")
+        return redirect(url_for("tasks"))
+    
+    cursor = conn.cursor()
+    
+    # Prüfen, ob die Aufgabe dem Benutzer gehört
+    cursor.execute("""
+        SELECT t.id
+        FROM taskboard_tasks t
+        JOIN taskboard_columns c ON t.column_id = c.id
+        WHERE t.id = %s AND c.discord_id = %s
+    """, (task_id, session['discord_id']))
+    
+    if not cursor.fetchone():
+        conn.close()
+        flash("Keine Berechtigung für diese Aktion", "error")
+        return redirect(url_for('tasks'))
+    
+    # Aufgabe löschen
+    cursor.execute("""
+        DELETE FROM taskboard_tasks
+        WHERE id = %s
+    """, (task_id,))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('tasks'))
+
+@app.route('/move_task', methods=['POST'])
+def move_task():
+    """Aufgabe per Drag & Drop verschieben."""
+    if 'discord_id' not in session:
+        return jsonify({'success': False, 'message': 'Nicht angemeldet'}), 401
+    
+    data = request.json
+    task_id = data.get('task_id')
+    new_column_id = data.get('column_id')
+    
+    if not task_id or not new_column_id:
+        return jsonify({'success': False, 'message': 'Fehlende Daten'}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Datenbankfehler'}), 500
+    
+    cursor = conn.cursor()
+    
+    # Prüfen, ob die Ziel-Spalte dem Benutzer gehört
+    cursor.execute("""
+        SELECT id FROM taskboard_columns 
+        WHERE id = %s AND discord_id = %s
+    """, (new_column_id, session['discord_id']))
+    
+    if not cursor.fetchone():
+        conn.close()
+        return jsonify({'success': False, 'message': 'Keine Berechtigung'}), 403
+    
+    # Aufgabe verschieben
+    cursor.execute("""
+        UPDATE taskboard_tasks
+        SET column_id = %s
+        WHERE id = %s
+    """, (new_column_id, task_id))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
+@app.route('/reorder_columns', methods=['POST'])
+def reorder_columns():
+    """Reihenfolge der Spalten aktualisieren."""
+    if 'discord_id' not in session:
+        return jsonify({'success': False, 'message': 'Nicht angemeldet'}), 401
+    
+    data = request.json
+    column_order = data.get('column_order', [])
+    
+    if not column_order:
+        return jsonify({'success': False, 'message': 'Fehlende Daten'}), 400
+    
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'success': False, 'message': 'Datenbankfehler'}), 500
+    
+    cursor = conn.cursor()
+    
+    # Spalten-Positionen aktualisieren
+    for index, column_id in enumerate(column_order):
+        cursor.execute("""
+            UPDATE taskboard_columns
+            SET position = %s
+            WHERE id = %s AND discord_id = %s
+        """, (index, column_id, session['discord_id']))
+    
+    conn.commit()
+    conn.close()
+    
+    return jsonify({'success': True})
+
 @app.route('/')
 def index():
     user = None
@@ -151,6 +498,7 @@ def index():
 
     # Render template mit Kontext-Daten und den berechtigten Discord-Mitgliedern
     return render_template('index.html', user=user, notes=notes, status=status, reminders=reminders, allowed_members=allowed_members)
+
 @app.route("/add_note", methods=["POST"])
 def add_note():
     """Adds a new note."""
@@ -377,10 +725,12 @@ def get_bot_status():
     result = subprocess.run(["docker", "inspect", "--format='{{.State.Running}}'", "discord-bot"], capture_output=True, text=True)
     is_running = "true" in result.stdout
     return {"status": "online" if is_running else "offline"}
+
 if __name__ == "__main__":
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor()
+        # Bestehende Tabellen
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_permissions (
             id SERIAL PRIMARY KEY,
@@ -389,6 +739,28 @@ if __name__ == "__main__":
             permission_type TEXT NOT NULL,
             UNIQUE(user_id, target_user_id, permission_type)
         )""")
+        
+        # Neue Tabellen für das Taskboard
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS taskboard_columns (
+            id SERIAL PRIMARY KEY,
+            discord_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            position INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS taskboard_tasks (
+            id SERIAL PRIMARY KEY,
+            column_id INTEGER REFERENCES taskboard_columns(id),
+            title TEXT NOT NULL,
+            description TEXT,
+            position INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )""")
+        
         conn.commit()
-    conn.close()
+        conn.close()
+    
     app.run(host="0.0.0.0", port=187, debug=True)
