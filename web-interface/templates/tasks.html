@@ -449,7 +449,7 @@
     const taskElement = checkboxElement.closest('.task');
     taskElement.classList.toggle('recurring', data.is_recurring);
   });
-
+}
         // Neue Funktion zum Umschalten des Completed-Status
         function toggleCompleted(taskId, isChecked, checkboxElement) {
   fetch('/toggle_completed_task', {
