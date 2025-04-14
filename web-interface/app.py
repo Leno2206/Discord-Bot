@@ -117,14 +117,14 @@ def tasks():
     
     # Spalten abrufen
     cursor.execute("""
-        SELECT id, name, position 
-        FROM taskboard_columns 
-        WHERE discord_id = %s 
-        ORDER BY position
-    """, (session['discord_id'],))
+    SELECT id, name, position, is_backlog
+    FROM taskboard_columns 
+    WHERE discord_id = %s 
+    ORDER BY position
+""", (session['discord_id'],))
     
     columns = []
-    for col_id, name, position in cursor.fetchall():
+    for col_id, name, position, is_backlog in cursor.fetchall():
         # Aufgaben für jede Spalte abrufen
         cursor.execute("""
             SELECT id, title, description, is_recurring, position
@@ -143,11 +143,12 @@ def tasks():
     for task_id, title, desc, is_recurring in cursor.fetchall()
 ]
         
-        columns.append({
-            'id': col_id,
-            'name': name,
-            'tasks': tasks
-        })
+    columns.append({
+    'id': col_id,
+    'name': name,
+    'tasks': tasks,
+    'is_backlog': is_backlog
+})
     
     conn.close()
     return render_template('tasks.html', columns=columns)
@@ -157,37 +158,38 @@ def add_column():
     """Neue Spalte hinzufügen."""
     if 'discord_id' not in session:
         return redirect(url_for('login'))
-    
+
     column_name = request.form.get('name')
+    is_backlog = bool(request.form.get('is_backlog'))
+
     if not column_name:
         flash("Spaltenname darf nicht leer sein", "error")
         return redirect(url_for('tasks'))
-    
+
     conn = get_db_connection()
     if not conn:
         flash("Fehler bei der Datenbankverbindung.", "error")
         return redirect(url_for("tasks"))
-    
+
     cursor = conn.cursor()
-    
+
     # Höchste Position finden
     cursor.execute("""
         SELECT COALESCE(MAX(position), -1) 
         FROM taskboard_columns 
         WHERE discord_id = %s
     """, (session['discord_id'],))
-    
     max_position = cursor.fetchone()[0]
-    
-    # Neue Spalte einfügen
+
+    # Neue Spalte einfügen (inkl. is_backlog)
     cursor.execute("""
-        INSERT INTO taskboard_columns (discord_id, name, position)
-        VALUES (%s, %s, %s)
-    """, (session['discord_id'], column_name, max_position + 1))
-    
+        INSERT INTO taskboard_columns (discord_id, name, position, is_backlog)
+        VALUES (%s, %s, %s, %s)
+    """, (session['discord_id'], column_name, max_position + 1, is_backlog))
+
     conn.commit()
     conn.close()
-    
+
     return redirect(url_for('tasks'))
 
 @app.route('/edit_column/<int:column_id>', methods=['POST'])
