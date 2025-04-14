@@ -115,6 +115,15 @@
     background-color: #f0f8ff;
     transition: background-color 0.2s, border 0.2s;
 }
+.task.placeholder {
+    background-color: #f9f9f9;
+    border: 2px dashed #ccc;
+    color: #aaa;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+    cursor: default;
+}
     </style>
 </head>
 <body>
@@ -132,17 +141,14 @@
                 </div>
             </div>
             <div class="task-list" id="column-{{ column.id }}">
+                {% if column.tasks|length == 0 %}
+                    <div class="task placeholder">Hierhin ziehen</div>
+                {% endif %}
                 {% for task in column.tasks %}
                     <div class="task" data-task-id="{{ task.id }}">
                         <strong>{{ task.title }}</strong><br>
                         <small>{{ task.description }}</small>
-                        <div class="task-actions">
-                            <button class="btn-edit" onclick="openEditTaskModal({{ task.id }}, '{{ task.title }}', '{{ task.description }}')">✏️</button>
-                            <form style="display: inline;" action="{{ url_for('delete_task', task_id=task.id) }}" method="post"
-                                  onsubmit="return confirm('Aufgabe wirklich löschen?')">
-                                <button type="submit" class="btn-delete">🗑️</button>
-                            </form>
-                        </div>
+                        ...
                     </div>
                 {% endfor %}
             </div>
