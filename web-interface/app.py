@@ -126,30 +126,30 @@ def tasks():
     columns = []
     for col_id, name, position, is_backlog in cursor.fetchall():
         # Aufgaben für jede Spalte abrufen
-         cursor.execute("""
+        cursor.execute("""
         SELECT id, title, description, is_recurring, is_completed, position
         FROM taskboard_tasks
         WHERE column_id = %s
         ORDER BY position
     """, (col_id,))
     
-    tasks = [
-        {
-            'id': task_id,
-            'title': title,
-            'description': desc,
-            'is_recurring': is_recurring,
-            'is_completed': is_completed
-        }
-        for task_id, title, desc, is_recurring, is_completed, _ in cursor.fetchall()
-    ]
-        
-    columns.append({
-    'id': col_id,
-    'name': name,
-    'tasks': tasks,
-    'is_backlog': is_backlog
-})
+        tasks = [
+            {
+                'id': task_id,
+                'title': title,
+                'description': desc,
+                'is_recurring': is_recurring,
+                'is_completed': is_completed
+            }
+            for task_id, title, desc, is_recurring, is_completed, _ in cursor.fetchall()
+        ]
+            
+        columns.append({
+            'id': col_id,
+            'name': name,
+            'tasks': tasks,
+            'is_backlog': is_backlog
+        })
     
     conn.close()
     return render_template('tasks.html', columns=columns)
