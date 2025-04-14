@@ -298,7 +298,6 @@ def add_task(column_id):
     
     conn.commit()
     conn.close()
-    
     return redirect(url_for('tasks'))
 
 @app.route('/edit_task/<int:task_id>', methods=['POST'])
