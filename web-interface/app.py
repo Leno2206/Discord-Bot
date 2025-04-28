@@ -348,7 +348,7 @@ def edit_task(task_id):
 
 @app.route("/sh4u")
 def sh4u():
-    return render_template("sh4u") 
+    return render_template("sh4u.html") 
 @app.route('/delete_task/<int:task_id>', methods=['POST'])
 def delete_task(task_id):
     """Aufgabe löschen."""
