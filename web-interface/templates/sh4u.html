@@ -12,6 +12,9 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   text-align: left;
+  flex:1;
+  max-width:400px;
+  margin:0;
 }
 
 .tech-list h3 {
@@ -48,10 +51,12 @@
 .content-wrapper {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 40px;
-  flex-wrap: wrap;
+  max-width: 1200px; /* Begrenzung für zu große Abstände */
+  margin: 0 auto;     /* zentriert das Ganze horizontal */
   padding: 20px;
+  flex-wrap: wrap;    /* Damit es auf kleineren Bildschirmen trotzdem umbricht */
 }
 
 .main-image {
