@@ -45,34 +45,51 @@
   transform: translateX(5px);
   color: #00f3ff;
 }
+.content-wrapper {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+  padding: 20px;
+}
+
+.main-image {
+  max-width: 400px;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
 
 </style>
 
 
 
 <body>
-    <img src="{{ url_for('static', filename='images/image.svg') }}" alt="Mein Bild">
-<!-- Font Awesome (für Icons) einbinden -->
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
-
-<div class="tech-list">
-  <h3><i class="fas fa-cogs"></i> Technologien</h3>
-  <ul>
-    <li><i class="fab fa-python"></i> Python</li>
-    <li><i class="fas fa-fire"></i> Flask</li>
-    <li><i class="fas fa-database"></i> PostgreSQL</li>
-    <li><i class="fas fa-microchip"></i> Raspberry Pi / Unix</li>
-    <li><i class="fas fa-network-wired"></i> NGINX / Reverse Proxy</li>
-    <li><i class="fas fa-wifi"></i> Fritz!Box / Router</li>
-    <li><i class="fas fa-sync-alt"></i> DynDNS</li>
-    <li><i class="fas fa-certificate"></i> SSL-Zertifikate (Let's Encrypt)</li>
-    <li><i class="fab fa-docker"></i> Docker</li>
-    <li><i class="fas fa-layer-group"></i> docker-compose</li>
-    <li><i class="fab fa-git-alt"></i> Git</li>
-    <li><i class="fas fa-terminal"></i> SSH</li>
-    <li><i class="fas fa-lock"></i> WireGuard</li>
-    <li><i class="fas fa-shield-alt"></i> VPN</li>
-  </ul>
-</div>
+    <div class="content-wrapper">
+        <img src="{{ url_for('static', filename='images/image.svg') }}" alt="Mein Bild" class="main-image">
+      
+        <div class="tech-list">
+          <h3><i class="fas fa-cogs"></i> Technologien</h3>
+          <ul>
+            <li><i class="fab fa-python"></i> Python</li>
+            <li><i class="fas fa-fire"></i> Flask</li>
+            <li><i class="fas fa-database"></i> PostgreSQL</li>
+            <li><i class="fas fa-microchip"></i> Raspberry Pi / Unix</li>
+            <li><i class="fas fa-network-wired"></i> NGINX / Reverse Proxy</li>
+            <li><i class="fas fa-wifi"></i> Fritz!Box / Router</li>
+            <li><i class="fas fa-sync-alt"></i> DynDNS</li>
+            <li><i class="fas fa-certificate"></i> SSL-Zertifikate (Let's Encrypt)</li>
+            <li><i class="fab fa-docker"></i> Docker</li>
+            <li><i class="fas fa-layer-group"></i> docker-compose</li>
+            <li><i class="fab fa-git-alt"></i> Git</li>
+            <li><i class="fas fa-terminal"></i> SSH</li>
+            <li><i class="fas fa-lock"></i> WireGuard</li>
+            <li><i class="fas fa-shield-alt"></i> VPN</li>
+          </ul>
+        </div>
+      </div>
+      
 </body></head>
 
