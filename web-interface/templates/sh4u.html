@@ -1,1 +1,76 @@
-<img src="{{ url_for('static', filename='images/image.svg') }}" alt="Mein Bild">
+<head><style>
+    .tech-list {
+  margin-top: 30px;
+  padding: 25px;
+  background: linear-gradient(135deg, #1f1c2c, #928dab);
+  color: white;
+  border-radius: 15px;
+  width: fit-content;
+  max-width: 90%;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  text-align: left;
+}
+
+.tech-list h3 {
+  font-size: 1.8em;
+  text-align: center;
+  margin-bottom: 15px;
+}
+
+.tech-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tech-list li {
+  font-size: 1.1em;
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.tech-list li i {
+  width: 25px;
+  text-align: center;
+  color: #ffd369;
+}
+
+.tech-list li:hover {
+  transform: translateX(5px);
+  color: #00f3ff;
+}
+
+</style>
+
+
+
+<body>
+    <img src="{{ url_for('static', filename='images/image.svg') }}" alt="Mein Bild">
+<!-- Font Awesome (für Icons) einbinden -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+
+<div class="tech-list">
+  <h3><i class="fas fa-cogs"></i> Technologien</h3>
+  <ul>
+    <li><i class="fab fa-python"></i> Python</li>
+    <li><i class="fas fa-fire"></i> Flask</li>
+    <li><i class="fas fa-database"></i> PostgreSQL</li>
+    <li><i class="fas fa-microchip"></i> Raspberry Pi / Unix</li>
+    <li><i class="fas fa-network-wired"></i> NGINX / Reverse Proxy</li>
+    <li><i class="fas fa-wifi"></i> Fritz!Box / Router</li>
+    <li><i class="fab fa-docker"></i> Docker</li>
+    <li><i class="fas fa-layer-group"></i> docker-compose</li>
+    <li><i class="fab fa-git-alt"></i> Git</li>
+    <li><i class="fas fa-terminal"></i> SSH</li>
+    <li><i class="fas fa-lock"></i> WireGuard</li>
+    <li><i class="fas fa-shield-alt"></i> VPN</li>
+  </ul>
+</div>
+</body></head>
+
