@@ -1,0 +1,41 @@
+services:
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TIMEZONE}
+    volumes: 
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DATABASE_PORT}:5432" 
+  discord-bot:
+    build: ./discord-bot
+    container_name: discord-bot
+    depends_on:
+      - postgres-db
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
+    restart: always
+
+  web-interface:
+    build: ./web-interface
+    container_name: web-interface
+    depends_on:
+      - postgres-db
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
+    ports:
+      - "${WEB_PORT}:${WEB_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+
+volumes:
+  postgres_data:

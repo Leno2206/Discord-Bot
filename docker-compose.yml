@@ -1,41 +1,41 @@
-services:
-  postgres-db:
-    image: postgres:15
-    container_name: postgres-db
-    restart: always
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      TZ: ${TIMEZONE}
-    volumes: 
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "${DATABASE_PORT}:5432" 
-  discord-bot:
-    build: ./discord-bot
-    container_name: discord-bot
-    depends_on:
-      - postgres-db
-    environment:
-      - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
-      - TZ=${TIMEZONE}
-    restart: always
+version: '3.8'
 
-  web-interface:
-    build: ./web-interface
-    container_name: web-interface
-    depends_on:
-      - postgres-db
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
-      - TZ=${TIMEZONE}
-    ports:
-      - "${WEB_PORT}:${WEB_PORT}"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+services:
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: wordpress
     restart: always
+    ports:
+      - "80:80"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppassword
+      WORDPRESS_DB_NAME: wpdb
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - wp_network
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:latest
+    container_name: mysql_wp
+    restart: always
+    environment:
+      MYSQL_DATABASE: wpdb
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wp_network
 
 volumes:
-  postgres_data:
+  wordpress_data:
+  db_data:
+
+networks:
+  wp_network:
