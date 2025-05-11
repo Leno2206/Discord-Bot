@@ -25,7 +25,7 @@ services:
     container_name: mysql_wp
     restart: always
     environment:
-      MYSQL_DATABASE: wpdb
+      MYSQL_DATABASE: mysql_wp
       MYSQL_USER: wpuser
       MYSQL_PASSWORD: wppassword
       MYSQL_ROOT_PASSWORD: rootpassword
