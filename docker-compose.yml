@@ -9,7 +9,7 @@ services:
       - "8080:80"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
     environment:
       APACHE_SERVER_NAME: discord.yusuf-kahya.com
-      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_HOST: mysql_wp
       WORDPRESS_DB_USER: wpuser
       WORDPRESS_DB_PASSWORD: wppassword
       WORDPRESS_DB_NAME: mysql_wp
