@@ -4,7 +4,6 @@ services:
   wordpress:
     image: wordpress:php8.2-apache
     container_name: wordpress
-    restart: no
     ports:
       - "8080:80"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
     environment:
@@ -23,7 +22,6 @@ services:
   db:
     image: mariadb:latest
     container_name: mysql_wp
-    restart: no
     environment:
       MYSQL_DATABASE: mysql_wp
       MYSQL_USER: wpuser
