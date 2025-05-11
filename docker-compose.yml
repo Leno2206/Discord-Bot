@@ -6,7 +6,7 @@ services:
     container_name: wordpress
     restart: always
     ports:
-      - "80:80"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
+      - "187:187"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: wpuser
