@@ -799,7 +799,7 @@ def restart_bot():
     """Neustart des Bots über Docker"""
     try:
         subprocess.run(["docker", "restart", "discord-bot"], check=True)  # Ändere den Containernamen falls nötig
-        return {"success": True, "message": "Bot wird neu gestartet..."}
+        return {"success": True, "message": "Bot wurde neu gestartet."}
     except subprocess.CalledProcessError as e:
         return {"success": False, "message": f"Fehler beim Neustart: {str(e)}"}
 

@@ -219,8 +219,9 @@
             let data = await response.json();
     
             if (data.success) {
-                console.log("Bot wird neu gestartet...");
+                console.log("Bot wird neu gestartet.?.");
                 setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
+                document.getElementById("message").textContent = "";
             } else {
                 alert("Fehler beim Neustart: " + data.message);
             }
