@@ -217,11 +217,11 @@
         try {
             let response = await fetch("/restart", { method: "POST" });
             let data = await response.json();
-    
+            let message=document.getElementById("message")
             if (data.success) {
                 console.log("Bot wird neu gestartet.?.");
                 setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
-                setTimeout(message.innerText="", 5000)
+                setTimeout(()=>{message.innerText="";}, 5000)
             } else {
                 alert("Fehler beim Neustart: " + data.message);
             }
