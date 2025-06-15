@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  wordpress:
+    image: wordpress:php8.2-apache
+    container_name: wordpress
+    ports:
+      - "8080:80"  
+    environment:
+      APACHE_SERVER_NAME: discord.yusuf-kahya.com
+      WORDPRESS_DB_HOST: mysql_wp
+      WORDPRESS_DB_USER: wpuser
+      WORDPRESS_DB_PASSWORD: wppassword
+      WORDPRESS_DB_NAME: mysql_wp
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - wp_network
+    depends_on:
+      - db
+
+  db:
+    image: mariadb:latest
+    container_name: mysql_wp
+    environment:
+      MYSQL_DATABASE: mysql_wp
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppassword
+      MYSQL_ROOT_PASSWORD: rootpassword
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - wp_network
+
+volumes:
+  wordpress_data:
+  db_data:
+
+networks:
+  wp_network:
