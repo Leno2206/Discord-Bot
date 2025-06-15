@@ -221,7 +221,7 @@
             if (data.success) {
                 console.log("Bot wird neu gestartet.?.");
                 setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
-                document.getElementById("message").textContent = "";
+                setTimeout(message.innerText="", 5000)
             } else {
                 alert("Fehler beim Neustart: " + data.message);
             }
