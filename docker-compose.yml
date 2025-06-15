@@ -5,7 +5,7 @@ services:
     image: wordpress:php8.2-apache
     container_name: wordpress
     ports:
-      - "8080:80"  # Wenn Ihre Flask-App Port 80 verwendet, ändern Sie z. B. auf "8080:80"
+      - "8080:80"  
     environment:
       APACHE_SERVER_NAME: discord.yusuf-kahya.com
       WORDPRESS_DB_HOST: mysql_wp
@@ -17,9 +17,9 @@ services:
     networks:
       - wp_network
     depends_on:
-      - db
+      - mysql_wp
 
-  db:
+  mysql_wp:
     image: mariadb:latest
     container_name: mysql_wp
     environment:
@@ -32,9 +32,49 @@ services:
     networks:
       - wp_network
 
+  postgres-db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TIMEZONE}
+    volumes: 
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DATABASE_PORT}:5432" 
+
+  discord-bot:
+    build: ./discord-bot
+    container_name: discord-bot
+    depends_on:
+      - postgres-db
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
+    restart: always
+
+  web-interface:
+    build: ./web-interface
+    container_name: web-interface
+    depends_on:
+      - postgres-db
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-db:5432/${POSTGRES_DB}
+      - TZ=${TIMEZONE}
+    ports:
+      - "${WEB_PORT}:${WEB_PORT}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: always
+
 volumes:
   wordpress_data:
   db_data:
+  postgres_data:
 
 networks:
   wp_network:
