@@ -13,13 +13,6 @@ import threading
 from typing import List, Dict
 from fastapi import Response
 GUILD_ID = "1148225365400109148"
-# Print token for debugging (remove this after fixing the issue)
-token = os.getenv("DISCORD_TOKEN")
-print(f"Token length: {len(token) if token else 'None'}")
-print(f"Token first 10 chars: {token[:10] if token else 'None'}")
-
-# Make sure to strip any whitespace
-token = token.strip() if token else None
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,  # Set the logging level to DEBUG to see all messages
@@ -53,7 +46,8 @@ async def get_discord_members():
     guild = bot.get_guild(int(GUILD_ID))
     if not guild:
         raise HTTPException(status_code=404, detail="Guild not found")
-    
+    if not guild.chunked:
+        await guild.chunk(cache=True)
     members = [
         {"id": str(m.id), "name": m.display_name}
         for m in guild.members if not m.bot

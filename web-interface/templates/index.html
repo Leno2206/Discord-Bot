@@ -209,39 +209,14 @@
     setInterval(updateStatus, 5000);
     updateStatus();
     
-    async function restartBot() {
-        console.log("hallo")
-        let button = document.getElementById("restartButton");
-        button.disabled = true;
-        button.innerText = "Neustart läuft...";
-    
-        try {
-            let response = await fetch("/restart", { method: "POST" });
-            let data = await response.json();
-            let message=document.getElementById("message")
-            if (data.success) {
-                console.log("Bot wird neu gestartet.?.");
-                setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
-                setTimeout(()=>{console.log("hi");message.textContent="";}, 5000)
-            } else {
-                alert("Fehler beim Neustart: " + data.message);
-            }
-        } catch (error) {
-            alert("Fehler beim Neustart.");
-            console.error(error);
-        }
-    
-        setTimeout(() => {
-            button.disabled = false;
-            button.innerText = "Bot Neustarten 🔄";
-        }, 10000); // Nach 10 Sekunden wieder aktivieren
-    }
+
+
     </script>
     <!-- Dropdown mit den berechtigten Discord-Mitgliedern -->
     <a href="{{ url_for('tasks') }}">
         <button class="btn btn-primary">🧹 Haushalts-Tasks organisieren</button>
       </a>
-        <div id="message"></div>
+
 
         <h2>📝 Notizen</h2>
         <form action="/add_note" method="post">
@@ -352,23 +327,36 @@
     </div>
 
     <script>
-        function restartBot() {
+        async function restartBot() {
             document.querySelector(".status").classList.add("offline");
             document.querySelector(".status").textContent = "Bot ist Offline";
-
+            let button = document.getElementById("restartButton");
+            button.disabled = true;
+            button.innerText = "Neustart läuft...";
+    
+        try {
+            let response = await fetch("/restart", { method: "POST" });
+            let data = await response.json();
+            if (data.success) {
+                setTimeout(updateStatus, 5000); // 5 Sekunden warten, dann Status prüfen
+            } else {
+                alert("Fehler beim Neustart: " + data.message);
+            }
+        } catch (error) {
+            alert("Fehler beim Neustart.");
+            console.error(error);
+        }
+    
+        setTimeout(() => {
+            button.disabled = false;
+            button.innerText = "Bot Neustarten 🔄";
+        }, 10000); // Nach 10 Sekunden wieder aktivieren
+    }
             fetch("/restart", { method: "POST" })
             .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById("message").textContent = data.message;
-                } else {
-                    document.getElementById("message").textContent = "Fehler beim Stoppen des Bots.";
-                }
-            })
             .catch(error => {
-                document.getElementById("message").textContent = "Fehler: " + error;
+                console.log(error);
             });
-        }
 
         // Open edit modal
         function openEditModal(noteId, noteText) {
