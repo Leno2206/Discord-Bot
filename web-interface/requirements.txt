@@ -1,5 +1,5 @@
 flask
-psycopg2
+pymysql
 authlib
 requests
 requests_oauthlib

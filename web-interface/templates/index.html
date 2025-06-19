@@ -224,21 +224,22 @@
             <button type="submit">Hinzufügen</button>
         </form>
 
-        <div class="note-list">
-            {% if notes %}
-                {% for note in notes %}
-                <div class="note-item">
-                    <span id="note-text-{{ note[0] }}">{{ note[1] }}</span>
-                    <span class="note-actions">
-                        <a onclick="openEditModal({{ note[0] }}, '{{ note[1] }}')">✏️ Bearbeiten</a>
-                        <a href="{{ url_for('delete_note', note_id=note[0]) }}">🗑️ Löschen</a>
-                    </span>
-                </div>
-                {% endfor %}
-            {% else %}
-                <p>Keine Notizen gefunden.</p>
-            {% endif %}
+<div class="note-list">
+    {% if notes %}
+        {% for note in notes %}
+        <div class="note-item">
+            <span id="note-text-{{ note['id'] }}">{{ note['note'] }}</span>
+            <span class="note-actions">
+                <a onclick="openEditModal({{ note['id'] }}, '{{ note['note'] }}')">✏️ Bearbeiten</a>
+                <a href="{{ url_for('delete_note', note_id=note['id']) }}">🗑️ Löschen</a>
+            </span>
         </div>
+        {% endfor %}
+    {% else %}
+        <p>Keine Notizen vorhanden.</p>
+    {% endif %}
+</div>
+
         <h2>⏰ Erinnerungen</h2>
         <form action="/add_reminder" method="post">
             <input type="text" name="reminder" placeholder="New reminder..." required>
@@ -326,14 +327,14 @@
         </div>
     </div>
 
-    <script>
-        async function restartBot() {
-            document.querySelector(".status").classList.add("offline");
-            document.querySelector(".status").textContent = "Bot ist Offline";
-            let button = document.getElementById("restartButton");
-            button.disabled = true;
-            button.innerText = "Neustart läuft...";
-    
+ <script>
+    async function restartBot() {
+        document.querySelector(".status").classList.add("offline");
+        document.querySelector(".status").textContent = "Bot ist Offline";
+        let button = document.getElementById("restartButton");
+        button.disabled = true;
+        button.innerText = "Neustart läuft...";
+
         try {
             let response = await fetch("/restart", { method: "POST" });
             let data = await response.json();
@@ -346,18 +347,12 @@
             alert("Fehler beim Neustart.");
             console.error(error);
         }
-    
+
         setTimeout(() => {
             button.disabled = false;
             button.innerText = "Bot Neustarten 🔄";
         }, 10000); // Nach 10 Sekunden wieder aktivieren
     }
-            fetch("/restart", { method: "POST" })
-            .then(response => response.json())
-            .catch(error => {
-                console.log(error);
-            });
-
         // Open edit modal
         function openEditModal(noteId, noteText) {
             document.getElementById("editNoteId").value = noteId;

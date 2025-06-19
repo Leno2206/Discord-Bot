@@ -1,5 +1,5 @@
 import nextcord
-import asyncpg
+import aiomysql  # GEÄNDERT: asyncpg -> aiomysql
 import os
 import asyncio
 import logging
@@ -12,6 +12,7 @@ from starlette.status import HTTP_403_FORBIDDEN
 import threading
 from typing import List, Dict
 from fastapi import Response
+
 GUILD_ID = "1148225365400109148"
 # Configure logging
 logging.basicConfig(
@@ -27,19 +28,31 @@ API_KEY = os.getenv("API_KEY", "Leno2206")  # In Produktion ändern
 API_KEY_NAME = "X-API-Key"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
-app=FastAPI()
+app = FastAPI()
 
-intents=nextcord.Intents.default()
-intents.members=True
+intents = nextcord.Intents.default()
+intents.members = True
 bot = nextcord.Client(intents=intents)
+
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header == API_KEY:
         return api_key_header
     raise HTTPException(
         status_code=HTTP_403_FORBIDDEN, detail="Invalid API key"
     )
+
+# GEÄNDERT: MySQL Connection Pool
 async def create_db_pool():
-    return await asyncpg.create_pool(DATABASE_URL)
+    return await aiomysql.create_pool(
+        host='mysql_wp',  # Docker service name
+        port=3306,
+        user='wpuser',
+        password='wppassword',
+        db='mysql_wp',
+        charset='utf8mb4',
+        autocommit=True,
+        maxsize=10
+    )
 
 @app.get('/api/discord/members')
 async def get_discord_members():
@@ -54,45 +67,57 @@ async def get_discord_members():
     ]
     
     return members
+
+# GEÄNDERT: MySQL Table Setup mit Cursor
 async def setup_database():
     global db_pool
     db_pool = await create_db_pool()
     async with db_pool.acquire() as conn:
-        # Create notes table if it doesn't exist
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS notes (
-                id SERIAL PRIMARY KEY,
-                discord_id TEXT NOT NULL,
-                note TEXT NOT NULL
-            )
-        """)
-        
-        # Create reminders table if it doesn't exist
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS reminders (
-                id SERIAL PRIMARY KEY,
-                discord_id TEXT NOT NULL,
-                note TEXT NOT NULL,
-                reminder_time TIMESTAMP NOT NULL
-            )
-        """)
-        await conn.execute("""
-    CREATE TABLE IF NOT EXISTS user_permissions (
-        id SERIAL PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        target_user_id TEXT NOT NULL,
-        permission_type TEXT NOT NULL,
-        UNIQUE(user_id, target_user_id, permission_type)
-    )
-""")
+        async with conn.cursor() as cursor:
+            # GEÄNDERT: SERIAL -> AUTO_INCREMENT, TEXT -> VARCHAR/TEXT
+            await cursor.execute("""
+                CREATE TABLE IF NOT EXISTS notes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    discord_id VARCHAR(255) NOT NULL,
+                    note TEXT NOT NULL,
+                    INDEX idx_discord_id (discord_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            
+            # GEÄNDERT: TIMESTAMP -> DATETIME
+            await cursor.execute("""
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    discord_id VARCHAR(255) NOT NULL,
+                    note TEXT NOT NULL,
+                    reminder_time DATETIME NOT NULL,
+                    INDEX idx_discord_id (discord_id),
+                    INDEX idx_reminder_time (reminder_time)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            
+            await cursor.execute("""
+                CREATE TABLE IF NOT EXISTS user_permissions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id VARCHAR(255) NOT NULL,
+                    target_user_id VARCHAR(255) NOT NULL,
+                    permission_type VARCHAR(255) NOT NULL,
+                    UNIQUE KEY unique_permission (user_id, target_user_id, permission_type),
+                    INDEX idx_user_id (user_id),
+                    INDEX idx_target_user_id (target_user_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
 
 @bot.event
 async def on_ready():
+    global db_pool
+    if 'db_pool' not in globals() or db_pool is None:
+        await setup_database()
     logging.info(f"Bot is online as {bot.user}")
-    await setup_database()
     logging.info("Starting check_reminders task")
     bot.loop.create_task(check_reminders())  # Start the reminder checking loop
 
+# GEÄNDERT: Alle $1, $2, $3 -> %s, %s, %s
 @bot.slash_command(name="revoke_permission", description="Revoke permission from another user ❌")
 async def revoke_permission(interaction: nextcord.Interaction, user_id: str, permission_type: str = "reminders"):
     """
@@ -102,13 +127,14 @@ async def revoke_permission(interaction: nextcord.Interaction, user_id: str, per
     :param permission_type: The type of permission to revoke (default: reminders).
     """
     async with db_pool.acquire() as conn:
-        result = await conn.execute(
-            "DELETE FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
-            str(interaction.user.id), user_id, permission_type
-        )
-        await interaction.response.send_message(f"Permission revoked: User {user_id} can no longer set {permission_type} for you.")
-@bot.slash_command(name="grant_permission", description="Grant permission to another user ✅")
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                "DELETE FROM user_permissions WHERE user_id = %s AND target_user_id = %s AND permission_type = %s",
+                (str(interaction.user.id), user_id, permission_type)
+            )
+            await interaction.response.send_message(f"Permission revoked: User {user_id} can no longer set {permission_type} for you.")
 
+@bot.slash_command(name="grant_permission", description="Grant permission to another user ✅")
 async def grant_permission(interaction: nextcord.Interaction, user_id: str, permission_type: str = "reminders"):
     """
     Grant another user permission to set reminders for you.
@@ -117,45 +143,49 @@ async def grant_permission(interaction: nextcord.Interaction, user_id: str, perm
     :param permission_type: The type of permission to grant (default: reminders).
     """
     async with db_pool.acquire() as conn:
-        try:
-            # Check if the permission already exists
-            exists = await conn.fetchrow(
-                "SELECT id FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
-                str(interaction.user.id), user_id, permission_type
-            )
-            
-            if exists:
-                await interaction.response.send_message(f"User {user_id} already has permission to set {permission_type} for you.")
-                return
+        async with conn.cursor() as cursor:
+            try:
+                # Check if the permission already exists
+                await cursor.execute(
+                    "SELECT id FROM user_permissions WHERE user_id = %s AND target_user_id = %s AND permission_type = %s",
+                    (str(interaction.user.id), user_id, permission_type)
+                )
+                exists = await cursor.fetchone()
                 
-            # Insert the new permission
-            await conn.execute(
-                "INSERT INTO user_permissions (user_id, target_user_id, permission_type) VALUES ($1, $2, $3)",
-                str(interaction.user.id), user_id, permission_type
-            )
-            await interaction.response.send_message(f"Permission granted: User {user_id} can now set {permission_type} for you.")
-        except Exception as e:
-            await interaction.response.send_message(f"Error: {str(e)}", ephemeral=True)
+                if exists:
+                    await interaction.response.send_message(f"User {user_id} already has permission to set {permission_type} for you.")
+                    return
+                    
+                # Insert the new permission
+                await cursor.execute(
+                    "INSERT INTO user_permissions (user_id, target_user_id, permission_type) VALUES (%s, %s, %s)",
+                    (str(interaction.user.id), user_id, permission_type)
+                )
+                await interaction.response.send_message(f"Permission granted: User {user_id} can now set {permission_type} for you.")
+            except Exception as e:
+                await interaction.response.send_message(f"Error: {str(e)}", ephemeral=True)
 
 @bot.slash_command(name="note", description="Save a note 💬")
 async def note(interaction: nextcord.Interaction, text: str):
     async with db_pool.acquire() as conn:
-        await conn.execute("INSERT INTO notes (discord_id, note) VALUES ($1, $2)", 
-                          str(interaction.user.id), text)
+        async with conn.cursor() as cursor:
+            await cursor.execute("INSERT INTO notes (discord_id, note) VALUES (%s, %s)", 
+                              (str(interaction.user.id), text))
     await interaction.response.send_message(f"Note saved: {text} ✅")
 
 @bot.slash_command(name="show_notes", description="Show your notes 📑")
 async def show_notes(interaction: nextcord.Interaction):
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch("SELECT note FROM notes WHERE discord_id = $1", 
-                               str(interaction.user.id))
+        async with conn.cursor() as cursor:
+            await cursor.execute("SELECT note FROM notes WHERE discord_id = %s", 
+                               (str(interaction.user.id),))
+            rows = await cursor.fetchall()
     
     if rows:
-        notes_str = "\n".join([row["note"] for row in rows])
+        notes_str = "\n".join([row[0] for row in rows])  # GEÄNDERT: row[0] statt row["note"]
         await interaction.response.send_message(f"Your notes:\n{notes_str}")
     else:
         await interaction.response.send_message("You have no saved notes. 😔")
-
 
 @bot.slash_command(name="add_reminder", description="Add a reminder ⏰")
 async def add_reminder(interaction: nextcord.Interaction, text: str, time: str, target_user_id: str = None):
@@ -181,44 +211,47 @@ async def add_reminder(interaction: nextcord.Interaction, text: str, time: str, 
     # If target_user_id is provided, check permissions
     if target_user_id and target_user_id != user_id:
         async with db_pool.acquire() as conn:
-            # Check if the user has permission
-            permission = await conn.fetchrow(
-                "SELECT id FROM user_permissions WHERE user_id = $1 AND target_user_id = $2 AND permission_type = $3",
-                target_user_id, user_id, "reminders"
-            )
-            
-            if not permission:
-                await interaction.response.send_message(
-                    f"You don't have permission to set reminders for user {target_user_id}.", 
-                    ephemeral=True
+            async with conn.cursor() as cursor:
+                # Check if the user has permission
+                await cursor.execute(
+                    "SELECT id FROM user_permissions WHERE user_id = %s AND target_user_id = %s AND permission_type = %s",
+                    (target_user_id, user_id, "reminders")
                 )
-                return
+                permission = await cursor.fetchone()
                 
-            reminder_id = await conn.fetchval(
-                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3) RETURNING id",
-                target_user_id, text, reminder_time
-            )
-            
-            await interaction.response.send_message(
-                f"Reminder set for user {target_user_id}: {text} at {reminder_time} UTC ✅"
-            )
-            
-            # Try to notify the target user
-            try:
-                target_user = await bot.fetch_user(int(target_user_id))
-                if target_user:
-                    await target_user.send(
-                        f"User {interaction.user.name} ({user_id}) set a reminder for you: {text} at {reminder_time} UTC"
+                if not permission:
+                    await interaction.response.send_message(
+                        f"You don't have permission to set reminders for user {target_user_id}.", 
+                        ephemeral=True
                     )
-            except Exception as e:
-                logging.error(f"Failed to notify user {target_user_id}: {e}")
+                    return
+                    
+                await cursor.execute(
+                    "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
+                    (target_user_id, text, reminder_time)
+                )
+                
+                await interaction.response.send_message(
+                    f"Reminder set for user {target_user_id}: {text} at {reminder_time} UTC ✅"
+                )
+                
+                # Try to notify the target user
+                try:
+                    target_user = await bot.fetch_user(int(target_user_id))
+                    if target_user:
+                        await target_user.send(
+                            f"User {interaction.user.name} ({user_id}) set a reminder for you: {text} at {reminder_time} UTC"
+                        )
+                except Exception as e:
+                    logging.error(f"Failed to notify user {target_user_id}: {e}")
     else:
         # Set reminder for self (original functionality)
         async with db_pool.acquire() as conn:
-            await conn.execute(
-                "INSERT INTO reminders (discord_id, note, reminder_time) VALUES ($1, $2, $3)",
-                user_id, text, reminder_time
-            )
+            async with conn.cursor() as cursor:
+                await cursor.execute(
+                    "INSERT INTO reminders (discord_id, note, reminder_time) VALUES (%s, %s, %s)",
+                    (user_id, text, reminder_time)
+                )
         await interaction.response.send_message(f"Reminder set: {text} at {reminder_time} UTC ✅")
 
 @bot.slash_command(name="list_permissions", description="List all permissions ⚙️")
@@ -231,31 +264,33 @@ async def list_permissions(interaction: nextcord.Interaction, direction: str = "
     user_id = str(interaction.user.id)
     
     async with db_pool.acquire() as conn:
-        if direction == "granted":
-            rows = await conn.fetch(
-                "SELECT target_user_id, permission_type FROM user_permissions WHERE user_id = $1",
-                user_id
-            )
-            
-            if not rows:
-                await interaction.response.send_message("You haven't granted permissions to anyone.")
-                return
+        async with conn.cursor() as cursor:
+            if direction == "granted":
+                await cursor.execute(
+                    "SELECT target_user_id, permission_type FROM user_permissions WHERE user_id = %s",
+                    (user_id,)
+                )
+                rows = await cursor.fetchall()
                 
-            permissions_list = "\n".join([f"User {row['target_user_id']} can set {row['permission_type']} for you" for row in rows])
-            await interaction.response.send_message(f"Permissions you've granted:\n{permissions_list}")
-        else:
-            rows = await conn.fetch(
-                "SELECT user_id, permission_type FROM user_permissions WHERE target_user_id = $1",
-                user_id
-            )
-            
-            if not rows:
-                await interaction.response.send_message("You haven't received permissions from anyone.")
-                return
+                if not rows:
+                    await interaction.response.send_message("You haven't granted permissions to anyone.")
+                    return
+                    
+                permissions_list = "\n".join([f"User {row[0]} can set {row[1]} for you" for row in rows])
+                await interaction.response.send_message(f"Permissions you've granted:\n{permissions_list}")
+            else:
+                await cursor.execute(
+                    "SELECT user_id, permission_type FROM user_permissions WHERE target_user_id = %s",
+                    (user_id,)
+                )
+                rows = await cursor.fetchall()
                 
-            permissions_list = "\n".join([f"You can set {row['permission_type']} for user {row['user_id']}" for row in rows])
-
-            await interaction.response.send_message(f"Permissions you've received:\n{permissions_list}")
+                if not rows:
+                    await interaction.response.send_message("You haven't received permissions from anyone.")
+                    return
+                    
+                permissions_list = "\n".join([f"You can set {row[1]} for user {row[0]}" for row in rows])
+                await interaction.response.send_message(f"Permissions you've received:\n{permissions_list}")
     
 @bot.slash_command(name="show_reminders", description="Show your reminders 📅")
 async def show_reminders(interaction: nextcord.Interaction):
@@ -263,13 +298,15 @@ async def show_reminders(interaction: nextcord.Interaction):
     Show all reminders for the user.
     """
     async with db_pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT note, reminder_time FROM reminders WHERE discord_id = $1 ORDER BY reminder_time ASC",
-            str(interaction.user.id)
-        )
+        async with conn.cursor() as cursor:
+            await cursor.execute(
+                "SELECT note, reminder_time FROM reminders WHERE discord_id = %s ORDER BY reminder_time ASC",
+                (str(interaction.user.id),)
+            )
+            rows = await cursor.fetchall()
     
     if rows:
-        reminders_str = "\n".join([f"{row['note']} - {row['reminder_time']}" for row in rows])
+        reminders_str = "\n".join([f"{row[0]} - {row[1]}" for row in rows])
         await interaction.response.send_message(f"Your reminders:\n{reminders_str}")
     else:
         await interaction.response.send_message("You have no reminders. 😔")
@@ -284,40 +321,38 @@ async def check_reminders():
         logging.info(f"Current time: {now}")
 
         async with db_pool.acquire() as conn:
-            # Fetch the next due reminder
-            row = await conn.fetchrow(
-                "SELECT id, discord_id, note, reminder_time FROM reminders WHERE reminder_time <= $1 ORDER BY reminder_time ASC LIMIT 1",
-                now
-            )
+            async with conn.cursor() as cursor:
+                # Fetch the next due reminder
+                await cursor.execute(
+                    "SELECT id, discord_id, note, reminder_time FROM reminders WHERE reminder_time <= %s ORDER BY reminder_time ASC LIMIT 1",
+                    (now,)
+                )
+                row = await cursor.fetchone()
 
-            if row:
-                reminder_time = row["reminder_time"]
-                time_until_reminder = (reminder_time - now).total_seconds()
+                if row:
+                    reminder_id, user_id, note, reminder_time = row
+                    time_until_reminder = (reminder_time - now).total_seconds()
 
-                if time_until_reminder > 0:
-                    logging.info(f"Sleeping for {time_until_reminder} seconds until the next reminder")
-                    await asyncio.sleep(time_until_reminder)
+                    if time_until_reminder > 0:
+                        logging.info(f"Sleeping for {time_until_reminder} seconds until the next reminder")
+                        await asyncio.sleep(time_until_reminder)
 
-                # Send the reminder
-                user_id = row["discord_id"]
-                note = row["note"]
-                reminder_id = row["id"]
+                    # Send the reminder
+                    try:
+                        user = await bot.fetch_user(int(user_id))
+                        if user:
+                            await user.send(f"⏰ Reminder: {note}")
+                            logging.info(f"Sent reminder to user {user_id}: {note}")
+                    except Exception as e:
+                        logging.error(f"Failed to send reminder to {user_id}: {e}")
 
-                try:
-                    user = await bot.fetch_user(int(user_id))
-                    if user:
-                        await user.send(f"⏰ Reminder: {note}")
-                        logging.info(f"Sent reminder to user {user_id}: {note}")
-                except Exception as e:
-                    logging.error(f"Failed to send reminder to {user_id}: {e}")
-
-                # Delete the reminder after sending it
-                await conn.execute("DELETE FROM reminders WHERE id = $1", reminder_id)
-                logging.info(f"Deleted reminder {reminder_id}")
-            else:
-                # No reminders found, sleep for a short duration before checking again
-                logging.info("No reminders found, sleeping for 10 seconds")
-                await asyncio.sleep(10)
+                    # Delete the reminder after sending it
+                    await cursor.execute("DELETE FROM reminders WHERE id = %s", (reminder_id,))
+                    logging.info(f"Deleted reminder {reminder_id}")
+                else:
+                    # No reminders found, sleep for a short duration before checking again
+                    logging.info("No reminders found, sleeping for 10 seconds")
+                    await asyncio.sleep(10)
 
 def run_api():
     uvicorn.run(app, host="0.0.0.0", port=8000)
@@ -329,7 +364,6 @@ def main():
     api_thread.daemon = True
     api_thread.start()
     logging.info("API server started on port 8000")
-    
     # Discord Bot starten
     bot.run(TOKEN)
 
