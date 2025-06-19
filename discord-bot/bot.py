@@ -34,6 +34,9 @@ intents = nextcord.Intents.default()
 intents.members = True
 bot = nextcord.Client(intents=intents)
 
+# Globale Variable für den Database Pool
+db_pool = None
+
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header == API_KEY:
         return api_key_header
