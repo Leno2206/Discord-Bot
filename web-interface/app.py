@@ -61,22 +61,31 @@ discord = oauth.register(
     client_kwargs={'scope': 'identify'},
 )
 
-# MySQL Verbindungskonfiguration
+# MySQL Verbindungskonfiguration mit Retry-Mechanismus
 def get_db_connection():
-    """Erstellt eine Verbindung zur MySQL-Datenbank."""
-    try:
-        conn = pymysql.connect(
-            host=os.getenv("MYSQL_HOST", "mysql_wp"),
-            user=os.getenv("MYSQL_USER", "wpuser"),
-            password=os.getenv("MYSQL_PASSWORD", "wppassword"),
-            db=os.getenv("MYSQL_DATABASE", "mysql_wp"),
-            charset='utf8mb4',
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        return conn
-    except pymysql.Error as e:
-        logging.error(f"Error connecting to database: {e}")
-        return None
+    """Erstellt eine Verbindung zur MySQL-Datenbank mit Retry-Mechanismus."""
+    max_retries = 5
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            conn = pymysql.connect(
+                host=os.getenv("MYSQL_HOST", "mysql_wp"),
+                user=os.getenv("MYSQL_USER", "wpuser"),
+                password=os.getenv("MYSQL_PASSWORD", "wppassword"),
+                db=os.getenv("MYSQL_DATABASE", "mysql_wp"),
+                charset='utf8mb4',
+                cursorclass=pymysql.cursors.DictCursor
+            )
+            return conn
+        except pymysql.Error as e:
+            logging.error(f"Attempt {attempt + 1}/{max_retries} failed to connect to database: {e}")
+            if attempt < max_retries - 1:
+                import time
+                time.sleep(retry_delay)
+            else:
+                logging.error("Failed to initialize database")
+                return None
 @app.route("/restart", methods=["POST"])
 def restart_bot():
     """Neustart des Bots über Docker"""

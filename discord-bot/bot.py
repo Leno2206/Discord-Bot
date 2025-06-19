@@ -44,18 +44,29 @@ async def get_api_key(api_key_header: str = Security(api_key_header)):
         status_code=HTTP_403_FORBIDDEN, detail="Invalid API key"
     )
 
-# GEÄNDERT: MySQL Connection Pool
+# GEÄNDERT: MySQL Connection Pool mit Retry-Mechanismus
 async def create_db_pool():
-    return await aiomysql.create_pool(
-        host='mysql_wp',  # Docker service name
-        port=3306,
-        user='wpuser',
-        password='wppassword',
-        db='mysql_wp',
-        charset='utf8mb4',
-        autocommit=True,
-        maxsize=10
-    )
+    max_retries = 5
+    retry_delay = 5
+    
+    for attempt in range(max_retries):
+        try:
+            return await aiomysql.create_pool(
+                host='mysql_wp',  # Docker service name
+                port=3306,
+                user='wpuser',
+                password='wppassword',
+                db='mysql_wp',
+                charset='utf8mb4',
+                autocommit=True,
+                maxsize=10
+            )
+        except Exception as e:
+            logging.error(f"Attempt {attempt + 1}/{max_retries} failed to connect to database: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(retry_delay)
+            else:
+                raise Exception(f"Failed to connect to database after {max_retries} attempts")
 
 @app.get('/api/discord/members')
 async def get_discord_members():
@@ -114,11 +125,20 @@ async def setup_database():
 @bot.event
 async def on_ready():
     global db_pool
-    if 'db_pool' not in globals() or db_pool is None:
-        await setup_database()
-    logging.info(f"Bot is online as {bot.user}")
-    logging.info("Starting check_reminders task")
-    bot.loop.create_task(check_reminders())  # Start the reminder checking loop
+    logging.info(f"Bot logged in as {bot.user}")
+    
+    # Datenbank-Setup mit Retry-Mechanismus
+    try:
+        if 'db_pool' not in globals() or db_pool is None:
+            await setup_database()
+        logging.info("Database setup completed successfully")
+        logging.info(f"Bot is online as {bot.user}")
+        logging.info("Starting check_reminders task")
+        bot.loop.create_task(check_reminders())  # Start the reminder checking loop
+    except Exception as e:
+        logging.error(f"Failed to initialize database: {e}")
+        # Bot wird nicht beendet, um Restart-Loop zu verhindern
+        logging.info("Bot will continue running without database functionality")
 
 # GEÄNDERT: Alle $1, $2, $3 -> %s, %s, %s
 @bot.slash_command(name="revoke_permission", description="Revoke permission from another user ❌")
